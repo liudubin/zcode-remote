@@ -71,6 +71,8 @@ final class SettingsViewController: UITableViewController {
                                                  get: { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
                                                  set: { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
 
+            (Section.about, Row(title: "禁用注入增强层（诊断）", subtitle: "纯 WebView 对照：开启后回退重进会话。若这样能连上，问题在增强层；仍连不上则对照 Safari 判断网络/系统",
+                                boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
             (Section.about, Row(title: "ZCodeRemote for iOS", subtitle: "非智谱官方产品，仅供个人学习使用。远控链接即凭证，只保存在本机。", boolKey: nil, segmented: nil)),
         ]
     }

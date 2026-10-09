@@ -142,6 +142,8 @@ final class WebViewController: UIViewController {
     /// （重）挂注入脚本：设置变化后重挂，下次页面加载即用新值
     private func installBootstrap(into ucc: WKUserContentController) {
         ucc.removeAllUserScripts()
+        // 诊断模式：完全不注入（连桥 shim 都不挂），等价纯 WebView 与 Safari 对照
+        if settings.bareWebview { return }
 
         // documentStart：shim + 生成物（CSS 常量 + bundle 函数），纯定义无副作用
         var prelude = ""

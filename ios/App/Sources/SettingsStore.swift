@@ -87,6 +87,12 @@ final class SettingsStore {
         set { d.set(newValue, forKey: K.amoledBlack) }
     }
 
+    /// 诊断：完全禁用注入增强层（纯 WebView 对照，排除增强层干扰）
+    var bareWebview: Bool {
+        get { bool(K.bareWebview, false) }
+        set { d.set(newValue, forKey: K.bareWebview) }
+    }
+
     /// 浮动 logo 位置（比例坐标；v65 起 logo 已移除，字段保留兼容桥接口）
     var logoPosSet: Bool {
         get { bool(K.logoPosSet, false) }
@@ -114,6 +120,7 @@ final class SettingsStore {
         static let restoreOnBottom = "restore_on_bottom"
         static let sendMinimize = "send_minimize"
         static let amoledBlack = "amoled_black"
+        static let bareWebview = "bare_webview"
         static let logoPosSet = "logo_pos_set"
         static let logoX = "logo_x"
         static let logoY = "logo_y"
