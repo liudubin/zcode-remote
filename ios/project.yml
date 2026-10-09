@@ -30,6 +30,7 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: ZCodeRemote
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
