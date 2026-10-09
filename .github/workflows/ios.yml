@@ -32,6 +32,7 @@ jobs:
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build 2>&1 | tail -60
 
       - name: Fake-sign & package IPA
@@ -40,20 +41,20 @@ jobs:
           ldid -S "$APP/ZCodeRemote"
           rm -rf pkg dist && mkdir -p pkg/Payload dist
           cp -R "$APP" pkg/Payload/
-          (cd pkg && zip -qry ../dist/ZCodeRemote-unsigned.ipa Payload)
+          (cd pkg && zip -qry "../dist/ZCodeRemote-0.0.2-ios${{ github.run_number }}-unsigned.ipa" Payload)
 
       - name: Package roothide deb
         run: |
           python3 ios/tools/make_deb.py \
             ios/.build/Build/Products/Release-iphoneos/ZCodeRemote.app \
-            dist
+            dist --version "0.0.2-ios${{ github.run_number }}"
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ZCodeRemote-ios
           path: |
-            dist/ZCodeRemote-unsigned.ipa
+            dist/*.ipa
             dist/*.deb
           retention-days: 30
 
