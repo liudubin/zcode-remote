@@ -89,6 +89,12 @@ jobs:
           xcrun simctl boot "$UDID" || true
           sleep 20   # 等 springboard 起来
           xcrun simctl install "$UDID" ios/.build/Build/Products/Debug-iphonesimulator/ZCodeRemote.app
+          # 入口页（重设计布局回归）
+          xcrun simctl launch "$UDID" com.zcode.remote
+          sleep 6
+          xcrun simctl io "$UDID" screenshot smoke-entry.png
+          xcrun simctl terminate "$UDID" com.zcode.remote || true
+          # 会话页直进
           xcrun simctl launch "$UDID" com.zcode.remote -zcodeURL "https://zcode.z.ai/remote/ci-smoke-test"
           sleep 15
           xcrun simctl io "$UDID" screenshot smoke-early.png
