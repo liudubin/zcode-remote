@@ -43,3 +43,6 @@ _bundle.js
 /state-check.png
 /.zcodeignore
 /dev/_serve_cors.py
+
+# CI 产物下载目录（本地留存，不入库）
+artifacts/
