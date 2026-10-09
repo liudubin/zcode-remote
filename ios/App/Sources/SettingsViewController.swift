@@ -38,7 +38,7 @@ final class SettingsViewController: UITableViewController {
         let title: String
         let subtitle: String?
         let boolKey: ((SettingsStore) -> Bool, (SettingsStore, Bool) -> Void)?
-        let segmented: ([String], _ get: () -> Int, _ set: (Int) -> Void)?
+        let segmented: (items: [String], get: () -> Int, set: (Int) -> Void)?
     }
 
     private enum Section { case page, background, about }
@@ -58,18 +58,18 @@ final class SettingsViewController: UITableViewController {
             (Section.page, Row(title: "纯黑 AMOLED（实验）", subtitle: "注入层换纯黑 token",
                                boolKey: ({ $0.amoledBlack }, { $0.amoledBlack = $1 }), segmented: nil)),
             (Section.page, Row(title: "文字缩放", subtitle: nil, boolKey: nil,
-                               segmented: (["75%", "100%", "125%", "150%"],
-                                           { self.settings.textZoom },
-                                           { self.settings.textZoom = $0 }))),
+                               segmented: (items: ["75%", "100%", "125%", "150%"],
+                                           get: { self.settings.textZoom },
+                                           set: { self.settings.textZoom = $0 }))),
 
             (Section.background, Row(title: "新回复通知", subtitle: "切出 App 后收到回复弹系统通知",
                                      boolKey: ({ $0.notifyReply }, { $0.notifyReply = $1 }), segmented: nil)),
             (Section.background, Row(title: "后台保活", subtitle: "切后台静音音频维持连接（后台音频模式）",
                                      boolKey: ({ $0.keepAliveEnabled }, { $0.keepAliveEnabled = $1 }), segmented: nil)),
             (Section.background, Row(title: "保活时长", subtitle: "超时自动停止省电", boolKey: nil,
-                                     segmented: (["10 分钟", "30 分钟", "不限"],
-                                                 { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
-                                                 { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
+                                     segmented: (items: ["10 分钟", "30 分钟", "不限"],
+                                                 get: { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
+                                                 set: { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
 
             (Section.about, Row(title: "ZCodeRemote for iOS", subtitle: "非智谱官方产品，仅供个人学习使用。远控链接即凭证，只保存在本机。", boolKey: nil, segmented: nil)),
         ]
