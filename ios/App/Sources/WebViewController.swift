@@ -397,7 +397,8 @@ extension WebViewController: WKNavigationDelegate {
         log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
 
         // DNS/瞬断类失败自动退避重试（真机实测 zcode.z.ai 在部分网络下间歇解析失败）
-        if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {            retryCount += 1
+        if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {
+            retryCount += 1
             let delay = Double(retryCount) * 1.5
             log.info("auto retry #\(self.retryCount) in \(Int(delay))s", privacy: .public)
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
