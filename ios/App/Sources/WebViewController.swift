@@ -28,6 +28,10 @@ final class WebViewController: UIViewController {
     /// 页面深浅（onTheme/onBars 回报）；状态栏与导航栏跟随
     private var barsDark: Bool?
 
+    /// 顶部自绘工具条与标题
+    private var topBar: UIVisualEffectView!
+    private let topTitle = UILabel()
+
     private static let maxAutoRetry = 2
     /// 最近一次中间进度（通知副标题用，对齐 Android 保活通知预览）
     private var lastPreview = ""
@@ -56,29 +60,71 @@ final class WebViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.background
-        title = machineLabel.isEmpty ? "ZCode 远控" : machineLabel
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            title: "返回", style: .plain, target: self, action: #selector(onBack)
-        )
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "设置", style: .plain, target: self, action: #selector(openSettingsUI)
-        )
-
+        // 全屏沉浸：不用系统导航栏（悬浮覆盖式会压住网页顶部），自绘工具条占位
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        buildTopBar()
         setupWebView()
         setupObservers()
         loadSession()
     }
 
+    /// 顶部工具条：毛玻璃占位式（返回 | 机器名 | 设置），WebView 从其下沿开始，互不遮挡
+    private func buildTopBar() {
+        let bar = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
+        bar.backgroundColor = Theme.background.withAlphaComponent(0.6)
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bar)
+
+        let back = UIButton(type: .system)
+        back.setTitle("‹ 返回", for: .normal)
+        back.setTitleColor(Theme.accent, for: .normal)
+        back.titleLabel?.font = .systemFont(ofSize: 17, weight: .medium)
+        back.addTarget(self, action: #selector(onBack), for: .touchUpInside)
+
+        let gear = UIButton(type: .system)
+        gear.setTitle("设置", for: .normal)
+        gear.setTitleColor(Theme.accent, for: .normal)
+        gear.titleLabel?.font = .systemFont(ofSize: 15)
+        gear.addTarget(self, action: #selector(openSettingsUI), for: .touchUpInside)
+
+        topTitle.text = machineLabel.isEmpty ? "ZCode 远控" : machineLabel
+        topTitle.textColor = Theme.text
+        topTitle.font = .systemFont(ofSize: 15, weight: .semibold)
+        topTitle.textAlignment = .center
+        topTitle.adjustsFontSizeToFitWidth = true
+        topTitle.minimumScaleFactor = 0.5
+
+        for v in [back, topTitle, gear] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            bar.contentView.addSubview(v)
+        }
+        NSLayoutConstraint.activate([
+            bar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            bar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bar.heightAnchor.constraint(equalToConstant: 44),
+            back.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 12),
+            back.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
+            gear.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -12),
+            gear.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
+            topTitle.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
+            topTitle.leadingAnchor.constraint(equalTo: back.trailingAnchor, constant: 8),
+            topTitle.trailingAnchor.constraint(equalTo: gear.leadingAnchor, constant: -8),
+        ])
+        topBar = bar
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        navigationController?.setNavigationBarHidden(false, animated: animated)
-        navigationController?.navigationBar.barStyle = .black
+        navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        // messageHandler 强引用 self，退出会话时解绑，避免 VC 泄漏
+        // 返回入口页时恢复其无导航栏布局；入口页自己会再次确认隐藏
         if isMovingFromParent {
+            navigationController?.setNavigationBarHidden(true, animated: animated)
+            // messageHandler 强引用 self，退出会话时解绑，避免 VC 泄漏
             webView?.configuration.userContentController.removeAllScriptMessageHandlers()
         }
     }
@@ -100,11 +146,12 @@ final class WebViewController: UIViewController {
         webView.navigationDelegate = self
         // JS 增强层自管左缘手势（三滑唤问题导航），关掉系统返回手势避免冲突
         webView.allowsBackForwardNavigationGestures = false
+        // 边到边：顶部被 topBar 占位，底部 home 条区域由原生写 __zcodeSafeB 让注入层抬升
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.backgroundColor = Theme.background
         view.addSubview(webView)
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.topAnchor),
+            webView.topAnchor.constraint(equalTo: topBar.bottomAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -115,7 +162,7 @@ final class WebViewController: UIViewController {
         progressView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(progressView)
         NSLayoutConstraint.activate([
-            progressView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            progressView.topAnchor.constraint(equalTo: topBar.bottomAnchor),
             progressView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             progressView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
@@ -326,7 +373,6 @@ extension WebViewController: WKScriptMessageHandler {
                 view.backgroundColor = c
                 webView.backgroundColor = c
             }
-            navigationController?.navigationBar.barStyle = tDark ? .black : .default
         case "openSettings":
             openSettingsUI()
         case "saveLogoPos":
