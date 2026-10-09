@@ -47,6 +47,8 @@ def add_bytes(tar: tarfile.TarFile, arcname: str, data: bytes, executable: bool 
 
 POSTINST = """#!/bin/sh
 # roothide: /var/jb/Applications；rootful 兜底: /Applications。注册到 SpringBoard。
+# 升级安装时先杀旧进程：正在运行的旧二进制不会热更新，杀掉后重开即新版
+killall %NAME% 2>/dev/null || true
 APP=""
 [ -d /var/jb/Applications/%NAME%.app ] && APP=/var/jb/Applications/%NAME%.app
 [ -z "$APP" ] && [ -d /Applications/%NAME%.app ] && APP=/Applications/%NAME%.app
