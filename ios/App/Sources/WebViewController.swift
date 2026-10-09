@@ -400,7 +400,7 @@ extension WebViewController: WKNavigationDelegate {
         if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {
             retryCount += 1
             let delay = Double(retryCount) * 1.5
-            log.info("auto retry #\(self.retryCount) in \(Int(delay))s", privacy: .public)
+            log.info("auto retry #\(self.retryCount, privacy: .public) in \(Int(delay), privacy: .public)s")
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.loadSession()
             }
