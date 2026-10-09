@@ -15,6 +15,13 @@ local.properties
 dev/_check_embedded.js
 __pycache__/
 
+# iOS 构建生成物（ZCodeBundle.js 由 ios/tools/build_bundle.py 生成，与 _bundle.js 同性质）
+ios/.build/
+ios/App/Resources/ZCodeBundle.js
+ios/dist/
+ios/pkg/
+*.ipa
+
 # dev/bundle/*.js 拼接生成的注入包（改 JS 改模块文件，勿手改）
 _bundle.js
 

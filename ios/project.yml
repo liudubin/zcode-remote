@@ -1,0 +1,47 @@
+name: ZCodeRemote
+options:
+  bundleIdPrefix: com.zcode
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    # 侧载分发（越狱设备 ldid 假签 / TrollStore），全程关闭开发者签名
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_ALLOWED: "NO"
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+targets:
+  ZCodeRemote:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zcode.remote
+        MARKETING_VERSION: "0.0.2"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: ZCodeRemote
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: true
+        NSCameraUsageDescription: 扫描桌面端 ZCode 的远控二维码需要使用相机
+        UIBackgroundModes:
+          - audio
+        ITSAppUsesNonExemptEncryption: false
+schemes:
+  ZCodeRemote:
+    build:
+      targets:
+        ZCodeRemote: all
+    run:
+      config: Debug

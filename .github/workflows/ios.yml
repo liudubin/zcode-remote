@@ -1,0 +1,58 @@
+name: Build iOS
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Rebuild embedded bundle + validate
+        # 与 Android CI 同款：先重拼注入包再全套校验（XML/Kotlin/JS 语法/资源引用），
+        # iOS 的 ZCodeBundle.js 由 build_bundle.py 从同一源生成，保证两端注入包不漂移
+        run: |
+          python3 _patch_web2.py
+          python3 _validate.py
+          python3 ios/tools/build_bundle.py
+
+      - name: Install xcodegen & ldid
+        run: brew install xcodegen ldid
+
+      - name: Generate Xcode project
+        run: cd ios && xcodegen generate
+
+      - name: Build (unsigned, device arm64)
+        run: |
+          cd ios
+          set -o pipefail
+          xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tail -60
+
+      - name: Fake-sign & package IPA
+        run: |
+          APP=ios/.build/Build/Products/Release-iphoneos/ZCodeRemote.app
+          ldid -S "$APP/ZCodeRemote"
+          rm -rf pkg dist && mkdir -p pkg/Payload dist
+          cp -R "$APP" pkg/Payload/
+          (cd pkg && zip -qry ../dist/ZCodeRemote-unsigned.ipa Payload)
+
+      - name: Package roothide deb
+        run: |
+          python3 ios/tools/make_deb.py \
+            ios/.build/Build/Products/Release-iphoneos/ZCodeRemote.app \
+            dist
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZCodeRemote-ios
+          path: |
+            dist/ZCodeRemote-unsigned.ipa
+            dist/*.deb
+          retention-days: 30

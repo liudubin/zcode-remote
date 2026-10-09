@@ -1,0 +1,5 @@
+# 统一 LF，防 Windows CRLF 破坏 shell 脚本 / control / Makefile 类文件（此前 CI 踩过坑）
+* text=auto eol=lf
+*.png binary
+*.keystore binary
+*.ico binary

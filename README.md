@@ -99,6 +99,10 @@ gradle assembleDebug
 
 需要 JDK 17 和 Gradle 8.9。详细开发流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+### 方式三：iOS 版（越狱设备侧载）
+
+[ios/](ios/README.md) 提供 iOS 适配：同一套注入增强层跑在 WKWebView 上，原生层用 Swift 重写（扫码 / 最近会话 / 回复通知 / 静音音频保活 / 键盘让位）。CI 同仓库产出未签名 IPA 与 **roothide scheme** deb（Relaxin / RootHide 架构实测目标），详见 [ios/README.md](ios/README.md)。
+
 ---
 
 ## 技术架构
