@@ -27,8 +27,13 @@ final class WebViewController: UIViewController {
 
     /// 页面深浅（onTheme/onBars 回报）；状态栏与导航栏跟随
     private var barsDark: Bool?
+
+    private static let maxAutoRetry = 2
     /// 最近一次中间进度（通知副标题用，对齐 Android 保活通知预览）
     private var lastPreview = ""
+
+    /// 网络瞬断自动重试计数（didCommit 成功即清零）
+    private var retryCount = 0
 
     private var observers: [NSObjectProtocol] = []
 
@@ -377,6 +382,7 @@ extension WebViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation?) {
+        retryCount = 0
         log.info("didCommit \(webView.url?.absoluteString ?? "-", privacy: .public)")
     }
 
@@ -389,10 +395,32 @@ extension WebViewController: WKNavigationDelegate {
         // NSURLErrorCancelled = 页面自身重定向/被新导航顶掉，正常现象不算失败
         guard ns.code != NSURLErrorCancelled else { return }
         log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
-        let alert = UIAlertController(title: "页面加载失败", message: error.localizedDescription, preferredStyle: .alert)
+
+        // DNS/瞬断类失败自动退避重试（真机实测 zcode.z.ai 在部分网络下间歇解析失败）
+        if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {            retryCount += 1
+            let delay = Double(retryCount) * 1.5
+            log.info("auto retry #\(self.retryCount) in \(Int(delay))s", privacy: .public)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.loadSession()
+            }
+            return
+        }
+
+        let hint = isTransientNetworkError(ns.code)
+            ? "手机网络访问 zcode.z.ai 失败（错误码 \(ns.code)）。如果桌面端挂着代理，手机也需要同样的网络环境；可在 Safari 里打开同一链接对照验证。"
+            : "\(error.localizedDescription)（错误码 \(ns.code)）"
+        let alert = UIAlertController(title: "页面加载失败", message: hint, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "返回", style: .default) { [weak self] _ in self?.onBack() })
         alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in self?.loadSession() })
         present(alert, animated: true)
+    }
+
+    /// DNS 解析失败/连接丢失/超时：大概率网络瞬断，自动重试有意义；
+    /// 其余（证书、不支持 URL 等）重试无意义，直接报错。
+    private func isTransientNetworkError(_ code: Int) -> Bool {
+        [NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost,
+         NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut,
+         NSURLErrorNotConnectedToInternet, NSURLErrorDNSLookupFailed].contains(code)
     }
 
     private func isZaiDomain(_ url: URL) -> Bool {
