@@ -1,6 +1,9 @@
+import OSLog
 import UIKit
 import UserNotifications
 import WebKit
+
+private let log = Logger(subsystem: "com.zcode.remote", category: "web")
 
 /// 会话页：WKWebView + 注入增强层 + 原生桥（对应 Android WebActivity）。
 ///
@@ -88,13 +91,19 @@ final class WebViewController: UIViewController {
         installBootstrap(into: config.userContentController)
 
         webView = WKWebView(frame: view.bounds, configuration: config)
-        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        webView.translatesAutoresizingMaskIntoConstraints = false
         webView.navigationDelegate = self
         // JS 增强层自管左缘手势（三滑唤问题导航），关掉系统返回手势避免冲突
         webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.backgroundColor = Theme.background
         view.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: view.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
 
         progressView = UIProgressView(progressViewStyle: .bar)
         progressView.tintColor = Theme.accent
@@ -367,9 +376,22 @@ extension WebViewController: WKNavigationDelegate {
         decisionHandler(.allow)
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation?) {
+        log.info("didCommit \(webView.url?.absoluteString ?? "-", privacy: .public)")
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+        log.info("didFinish \(webView.url?.absoluteString ?? "-", privacy: .public)")
+    }
+
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation?, withError error: Error) {
+        let ns = error as NSError
+        // NSURLErrorCancelled = 页面自身重定向/被新导航顶掉，正常现象不算失败
+        guard ns.code != NSURLErrorCancelled else { return }
+        log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
         let alert = UIAlertController(title: "页面加载失败", message: error.localizedDescription, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "返回", style: .default) { [weak self] _ in self?.onBack() })
+        alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in self?.loadSession() })
         present(alert, animated: true)
     }
 

@@ -5,8 +5,9 @@ import UserNotifications
 /// 入口页：扫码 / 粘贴获取 ZCode 远控链接，展示最近会话卡片。
 /// 远控链接即凭证，只保存在本机 UserDefaults，绝不上传。
 final class EntryViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
-    /// 进程内只自动跳转一次，避免从远控页返回入口后又被弹回去
-    private static var autoJumpedOnce = false
+    /// 进程内只自动跳转一次，避免从远控页返回入口后又被弹回去；
+    /// internal：AppDelegate 的 -zcodeURL 直进会置 true 压掉自动恢复
+    static var autoJumpedOnce = false
 
     private let store = RecentStore.shared
     private var recents: [Recent] = []

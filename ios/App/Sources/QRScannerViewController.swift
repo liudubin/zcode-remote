@@ -90,8 +90,14 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
                         from connection: AVCaptureConnection) {
         guard let obj = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
               obj.type == .qr, let value = obj.stringValue else { return }
+        guard !isClosing else { return }
+        isClosing = true
         session.stopRunning()
-        onFound?(value)
-        dismiss(animated: true)
+        // 必须先关扫码页再回调:fullScreen modal 盖着时立即 push 会话页,
+        // push 转场会被随后的 dismiss 打断,表现为扫码后界面不动(真机踩坑)
+        let found = onFound
+        dismiss(animated: true) { found?(value) }
     }
+
+    private var isClosing = false
 }
