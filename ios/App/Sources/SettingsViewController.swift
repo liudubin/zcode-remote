@@ -45,35 +45,35 @@ final class SettingsViewController: UITableViewController {
 
     private var rows: [(Section, Row)] {
         [
-            (Section.page, Row(title: "隐藏滚动条", subtitle: "内容占满全宽；关= 3px 细滚动条",
+            (Section.page, Row(title: "隐藏滚动条", subtitle: "关 = 3px 细滚动条",
                                boolKey: ({ $0.hideScrollbar }, { $0.hideScrollbar = $1 }), segmented: nil)),
-            (Section.page, Row(title: "对话问题导航", subtitle: "左缘三滑唤出问题列表",
+            (Section.page, Row(title: "对话问题导航", subtitle: "左缘三滑唤出",
                                boolKey: ({ $0.turnNavigator }, { $0.turnNavigator = $1 }), segmented: nil)),
-            (Section.page, Row(title: "浮动输入框", subtitle: "增强 UI 总开关：关= 纯网页观感",
+            (Section.page, Row(title: "浮动输入框", subtitle: "增强 UI 总开关",
                                boolKey: ({ $0.floatingInput }, { $0.floatingInput = $1 }), segmented: nil)),
             (Section.page, Row(title: "滑到底部恢复输入框", subtitle: nil,
                                boolKey: ({ $0.restoreOnBottom }, { $0.restoreOnBottom = $1 }), segmented: nil)),
-            (Section.page, Row(title: "发送后自动收纳", subtitle: "回复全屏阅读，点图标再唤出",
+            (Section.page, Row(title: "发送后自动收纳", subtitle: nil,
                                boolKey: ({ $0.sendMinimize }, { $0.sendMinimize = $1 }), segmented: nil)),
-            (Section.page, Row(title: "纯黑 AMOLED（实验）", subtitle: "注入层换纯黑 token",
+            (Section.page, Row(title: "纯黑 AMOLED", subtitle: "实验",
                                boolKey: ({ $0.amoledBlack }, { $0.amoledBlack = $1 }), segmented: nil)),
             (Section.page, Row(title: "文字缩放", subtitle: nil, boolKey: nil,
                                segmented: (items: ["75%", "100%", "125%", "150%"],
                                            get: { self.settings.textZoom },
                                            set: { self.settings.textZoom = $0 }))),
 
-            (Section.background, Row(title: "新回复通知", subtitle: "切出 App 后收到回复弹系统通知",
+            (Section.background, Row(title: "新回复通知", subtitle: "切出后弹系统通知",
                                      boolKey: ({ $0.notifyReply }, { $0.notifyReply = $1 }), segmented: nil)),
-            (Section.background, Row(title: "后台保活", subtitle: "切后台静音音频维持连接（后台音频模式）",
+            (Section.background, Row(title: "后台保活", subtitle: "静音音频维持连接",
                                      boolKey: ({ $0.keepAliveEnabled }, { $0.keepAliveEnabled = $1 }), segmented: nil)),
-            (Section.background, Row(title: "保活时长", subtitle: "超时自动停止省电", boolKey: nil,
+            (Section.background, Row(title: "保活时长", subtitle: nil, boolKey: nil,
                                      segmented: (items: ["10 分钟", "30 分钟", "不限"],
                                                  get: { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
                                                  set: { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
 
-            (Section.about, Row(title: "禁用注入增强层（诊断）", subtitle: "纯 WebView 对照：开启后回退重进会话。若这样能连上，问题在增强层；仍连不上则对照 Safari 判断网络/系统",
+            (Section.about, Row(title: "禁用注入增强层", subtitle: "诊断：连不上时对照，改后重进",
                                 boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
-            (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品，仅供个人学习使用。远控链接即凭证，只保存在本机。", boolKey: nil, segmented: nil)),
+            (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品 · 链接即凭证，仅存本机", boolKey: nil, segmented: nil)),
         ]
     }
 
