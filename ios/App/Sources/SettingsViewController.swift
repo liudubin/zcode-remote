@@ -73,7 +73,7 @@ final class SettingsViewController: UITableViewController {
 
             (Section.about, Row(title: "禁用注入增强层（诊断）", subtitle: "纯 WebView 对照：开启后回退重进会话。若这样能连上，问题在增强层；仍连不上则对照 Safari 判断网络/系统",
                                 boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
-            (Section.about, Row(title: "ZCodeRemote for iOS", subtitle: "非智谱官方产品，仅供个人学习使用。远控链接即凭证，只保存在本机。", boolKey: nil, segmented: nil)),
+            (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品，仅供个人学习使用。远控链接即凭证，只保存在本机。", boolKey: nil, segmented: nil)),
         ]
     }
 
@@ -89,7 +89,14 @@ final class SettingsViewController: UITableViewController {
         rows.enumerated().filter { $0.element.0 == s }.map { ($0.offset, $0.element.1) }
     }
 
-    private var sectionOrder: [Section] { [.page, .background, .about] }
+    private func sectionOrder: [Section] { [.page, .background, .about] }
+
+    /// 版本行：显示 marketing 版本 + CI 构建号（排障对包用）
+    private static func versionLine() -> String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "ZCodeRemote for iOS \(v)（build \(b)）"
+    }
 
     // MARK: - 表格
 
