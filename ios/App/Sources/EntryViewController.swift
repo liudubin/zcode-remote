@@ -2,9 +2,10 @@ import AVFoundation
 import UIKit
 import UserNotifications
 
-/// 入口页：扫码 / 粘贴获取 ZCode 远控链接，展示最近会话卡片。
+/// 入口页（重设计版）：滚动容器 + 键盘避让；头部品牌区、链接卡、扫码主按钮、
+/// 最近会话卡片列表（名字/域名/时间，右上×删除）、底部设置入口。
 /// 远控链接即凭证，只保存在本机 UserDefaults，绝不上传。
-final class EntryViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
+final class EntryViewController: UIViewController, UITextFieldDelegate {
     /// 进程内只自动跳转一次，避免从远控页返回入口后又被弹回去；
     /// internal：AppDelegate 的 -zcodeURL 直进会置 true 压掉自动恢复
     static var autoJumpedOnce = false
@@ -12,13 +13,15 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
     private let store = RecentStore.shared
     private var recents: [Recent] = []
 
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let inputUrl = UITextField()
+    private let scrollView = UIScrollView()
+    private let contentStack = UIStackView()
+    private let recentsStack = UIStackView()
+    private let recentsTitleRow = UIStackView()
     private let recentsHeader = UILabel()
     private let recentsEmpty = UILabel()
+    private let inputUrl = UITextField()
     private let toastLabel = UILabel()
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private var keyboardObservers: [NSObjectProtocol] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -30,6 +33,7 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
            Self.looksLikeRemoteLink(text) {
             inputUrl.text = text
         }
+        setupKeyboardAvoidance()
         requestNotifPermissionOnce()
     }
 
@@ -47,31 +51,102 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
     // MARK: - UI
 
     private func buildUI() {
-        let header = UIStackView()
-        header.axis = .vertical
-        header.spacing = 6
-        header.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(header)
+        scrollView.keyboardDismissMode = .interactive
+        scrollView.alwaysBounceVertical = true
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scrollView)
 
-        titleLabel.text = "ZCodeRemote"
-        titleLabel.font = .systemFont(ofSize: 30, weight: .bold)
-        titleLabel.textColor = Theme.text
+        contentStack.axis = .vertical
+        contentStack.spacing = 14
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentStack)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-        subtitleLabel.text = "把 ZCode 桌面端的「手机远控」网页，变成顺手的 iOS App"
-        subtitleLabel.font = .systemFont(ofSize: 13)
-        subtitleLabel.textColor = Theme.textSecondary
-        subtitleLabel.numberOfLines = 0
+            contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 16),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
+            contentStack.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: 20),
+            contentStack.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -20),
+        ])
 
-        header.addArrangedSubview(titleLabel)
-        header.addArrangedSubview(subtitleLabel)
+        contentStack.addArrangedSubview(buildHeader())
+        contentStack.addArrangedSubview(buildLinkCard())
+        contentStack.addArrangedSubview(buildPrimaryScanButton())
+        contentStack.addArrangedSubview(buildRecentsSection())
+        contentStack.addArrangedSubview(buildFooter())
 
-        // 链接输入 + 操作按钮
-        inputUrl.placeholder = "粘贴远控链接（https://zcode.z.ai/remote/...）"
+        toastLabel.alpha = 0
+        toastLabel.font = .systemFont(ofSize: 13)
+        toastLabel.textColor = .black
+        toastLabel.backgroundColor = Theme.accent
+        toastLabel.layer.cornerRadius = 8
+        toastLabel.clipsToBounds = true
+        toastLabel.textAlignment = .center
+        toastLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(toastLabel)
+        NSLayoutConstraint.activate([
+            toastLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+        ])
+    }
+
+    /// 品牌头部：绿色闪电 + 名称 + 副标题
+    private func buildHeader() -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 14
+        row.alignment = .center
+
+        let badge = UILabel()
+        badge.text = "⚡"
+        badge.font = .systemFont(ofSize: 34)
+        badge.textAlignment = .center
+        badge.layer.cornerRadius = 16
+        badge.clipsToBounds = true
+        badge.backgroundColor = Theme.card
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badge.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        badge.heightAnchor.constraint(equalToConstant: 56).isActive = true
+
+        let titles = UIStackView()
+        titles.axis = .vertical
+        titles.spacing = 3
+        let name = UILabel()
+        name.text = "ZCodeRemote"
+        name.font = .systemFont(ofSize: 24, weight: .bold)
+        name.textColor = Theme.text
+        let sub = UILabel()
+        sub.text = "手机远控你的 AI 编程智能体"
+        sub.font = .systemFont(ofSize: 13)
+        sub.textColor = Theme.textSecondary
+        titles.addArrangedSubview(name)
+        titles.addArrangedSubview(sub)
+
+        row.addArrangedSubview(badge)
+        row.addArrangedSubview(titles)
+        return row
+    }
+
+    /// 链接卡：输入框（内嵌粘贴按钮）+ 进入按钮
+    private func buildLinkCard() -> UIView {
+        let card = UIStackView()
+        card.axis = .vertical
+        card.spacing = 10
+        card.layoutMargins = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        card.isLayoutMarginsRelativeArrangement = true
+        card.backgroundColor = Theme.card
+        card.layer.cornerRadius = 16
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.isLayoutMarginsRelativeArrangement = true
+
+        inputUrl.placeholder = "https://zcode.z.ai/remote/…"
         inputUrl.backgroundColor = Theme.input
         inputUrl.textColor = Theme.text
         inputUrl.attributedPlaceholder = NSAttributedString(
-            string: inputUrl.placeholder ?? "",
-            attributes: [.foregroundColor: Theme.textSecondary]
+            string: inputUrl.placeholder ?? "", attributes: [.foregroundColor: Theme.textSecondary]
         )
         inputUrl.layer.cornerRadius = 10
         inputUrl.autocorrectionType = .no
@@ -79,113 +154,203 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
         inputUrl.keyboardType = .URL
         inputUrl.returnKeyType = .go
         inputUrl.delegate = self
-        inputUrl.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 1))
+        // 右侧已有"粘贴"overlay，清除按钮走 overlay 前的编辑区，避免二者重叠
+        inputUrl.clearButtonMode = .never
+        inputUrl.font = .systemFont(ofSize: 14)
+        inputUrl.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 1))
         inputUrl.leftViewMode = .always
-        inputUrl.font = .systemFont(ofSize: 13)
+
+        let pasteOverlay = UIButton(type: .system)
+        pasteOverlay.setTitle("粘贴", for: .normal)
+        pasteOverlay.setTitleColor(Theme.accent, for: .normal)
+        pasteOverlay.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        pasteOverlay.backgroundColor = Theme.card
+        pasteOverlay.layer.cornerRadius = 7
+        pasteOverlay.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 10)
+        pasteOverlay.addTarget(self, action: #selector(onPaste), for: .touchUpInside)
+        inputUrl.rightView = pasteOverlay
+        inputUrl.rightViewMode = .always
+
+        let go = UIButton(type: .system)
+        go.setTitle("用链接进入", for: .normal)
+        go.setTitleColor(Theme.text, for: .normal)
+        go.backgroundColor = Theme.input
+        go.layer.cornerRadius = 10
+        go.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
+        go.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        go.addTarget(self, action: #selector(onOpen), for: .touchUpInside)
+
         inputUrl.translatesAutoresizingMaskIntoConstraints = false
-        inputUrl.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        view.addSubview(inputUrl)
+        inputUrl.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        card.addArrangedSubview(inputUrl)
+        card.addArrangedSubview(go)
+        return card
+    }
 
-        let pasteBtn = actionButton("粘贴", selector: #selector(onPaste))
-        let scanBtn = actionButton("扫码", selector: #selector(onScan))
-        let openBtn = actionButton("进入", selector: #selector(onOpen))
-        openBtn.backgroundColor = Theme.accent
-        openBtn.setTitleColor(.black, for: .normal)
-        openBtn.titleLabel?.font = .boldSystemFont(ofSize: 15)
+    /// 扫码主按钮
+    private func buildPrimaryScanButton() -> UIView {
+        let scan = UIButton(type: .system)
+        scan.setTitle("扫桌面端二维码", for: .normal)
+        scan.setTitleColor(.black, for: .normal)
+        scan.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        scan.backgroundColor = Theme.accent
+        scan.layer.cornerRadius = 14
+        scan.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        scan.addTarget(self, action: #selector(onScan), for: .touchUpInside)
 
-        let buttons = UIStackView(arrangedSubviews: [pasteBtn, scanBtn, openBtn])
-        buttons.axis = .horizontal
-        buttons.distribution = .fillEqually
-        buttons.spacing = 10
-        buttons.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(buttons)
+        let hint = UILabel()
+        hint.text = "桌面端 ZCode 左下角「手机图标」→ 显示远控二维码"
+        hint.font = .systemFont(ofSize: 11)
+        hint.textColor = Theme.textSecondary
+        hint.textAlignment = .center
 
-        // 最近会话
+        let wrap = UIStackView()
+        wrap.axis = .vertical
+        wrap.spacing = 8
+        wrap.addArrangedSubview(scan)
+        wrap.addArrangedSubview(hint)
+        return wrap
+    }
+
+    /// 最近会话：标题行 + 卡片列表/空态
+    private func buildRecentsSection() -> UIView {
         recentsHeader.text = "最近会话"
         recentsHeader.font = .boldSystemFont(ofSize: 15)
         recentsHeader.textColor = Theme.text
-        recentsHeader.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(recentsHeader)
 
-        recentsEmpty.text = "还没有会话。扫描桌面端 ZCode 左下角「手机图标」的二维码开始。"
-        recentsEmpty.font = .systemFont(ofSize: 13)
+        let clearAll = UIButton(type: .system)
+        clearAll.setTitle("设置", for: .normal)
+        clearAll.setTitleColor(Theme.textSecondary, for: .normal)
+        clearAll.titleLabel?.font = .systemFont(ofSize: 13)
+        clearAll.addTarget(self, action: #selector(openSettingsUI), for: .touchUpInside)
+
+        recentsTitleRow.axis = .horizontal
+        recentsTitleRow.alignment = .center
+        recentsTitleRow.addArrangedSubview(recentsHeader)
+        recentsTitleRow.addArrangedSubview(clearAll)
+
+        recentsStack.axis = .vertical
+        recentsStack.spacing = 8
+
+        recentsEmpty.text = "还没有会话。扫桌面端二维码开始第一次连接。"
+        recentsEmpty.font = .systemFont(ofSize: 12)
         recentsEmpty.textColor = Theme.textSecondary
-        recentsEmpty.numberOfLines = 0
         recentsEmpty.textAlignment = .center
-        recentsEmpty.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(recentsEmpty)
 
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.backgroundColor = .clear
-        tableView.separatorColor = Theme.separator
-        tableView.rowHeight = 64
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(tableView)
+        let section = UIStackView()
+        section.axis = .vertical
+        section.spacing = 10
+        section.addArrangedSubview(recentsTitleRow)
+        section.addArrangedSubview(recentsStack)
+        section.addArrangedSubview(recentsEmpty)
+        return section
+    }
 
-        toastLabel.alpha = 0
-        toastLabel.font = .systemFont(ofSize: 13)
-        toastLabel.textColor = .black
-        toastLabel.backgroundColor = Theme.accent
-        toastLayer(toastLabel)
+    private func buildFooter() -> UIView {
+        let foot = UILabel()
+        foot.text = "非智谱官方产品 · 链接即凭证，仅存本机"
+        foot.font = .systemFont(ofSize: 10)
+        foot.textColor = Theme.textSecondary
+        foot.textAlignment = .center
+        return foot
+    }
 
+    /// 一张最近会话卡片：名字 + 域名/时间 + 删除×
+    private func buildRecentCard(_ r: Recent) -> UIView {
+        let card = UIControl()
+        card.backgroundColor = Theme.card
+        card.layer.cornerRadius = 12
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.addTarget(self, action: #selector(onRecentTap(_:)), for: .touchUpInside)
+        card.tag = recentsStack.arrangedSubviews.count
+
+        let title = UILabel()
+        title.text = r.displayLabel()
+        title.font = .systemFont(ofSize: 15, weight: .medium)
+        title.textColor = Theme.text
+
+        let sub = UILabel()
+        let time = Self.timeFormatter.string(from: Date(timeIntervalSince1970: r.last / 1000))
+        sub.text = "\(URL(string: r.url)?.host ?? r.url) · \(time)"
+        sub.font = .systemFont(ofSize: 11)
+        sub.textColor = Theme.textSecondary
+
+        let texts = UIStackView()
+        texts.axis = .vertical
+        texts.spacing = 3
+        texts.addArrangedSubview(title)
+        texts.addArrangedSubview(sub)
+
+        let del = UIButton(type: .system)
+        del.setTitle("×", for: .normal)
+        del.setTitleColor(Theme.textSecondary, for: .normal)
+        del.titleLabel?.font = .systemFont(ofSize: 18)
+        del.tag = card.tag
+        del.addTarget(self, action: #selector(onRecentDelete(_:)), for: .touchUpInside)
+
+        let chevron = UILabel()
+        chevron.text = "›"
+        chevron.textColor = Theme.textSecondary
+        chevron.font = .systemFont(ofSize: 18)
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 10
+        row.alignment = .center
+        row.layoutMargins = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
+        row.isLayoutMarginsRelativeArrangement = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.addArrangedSubview(texts)
+        row.addArrangedSubview(chevron)
+        row.addArrangedSubview(del)
+        card.addSubview(row)
         NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-
-            inputUrl.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 18),
-            inputUrl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            inputUrl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-
-            buttons.topAnchor.constraint(equalTo: inputUrl.bottomAnchor, constant: 12),
-            buttons.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            buttons.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            buttons.heightAnchor.constraint(equalToConstant: 42),
-
-            recentsHeader.topAnchor.constraint(equalTo: buttons.bottomAnchor, constant: 24),
-            recentsHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-
-            tableView.topAnchor.constraint(equalTo: recentsHeader.bottomAnchor, constant: 8),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-
-            recentsEmpty.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            recentsEmpty.topAnchor.constraint(equalTo: recentsHeader.bottomAnchor, constant: 30),
-            recentsEmpty.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
-            recentsEmpty.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
-
-            toastLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            toastLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -30),
+            row.topAnchor.constraint(equalTo: card.topAnchor),
+            row.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: card.trailingAnchor),
         ])
+        return card
     }
 
-    private func actionButton(_ title: String, selector: Selector) -> UIButton {
-        let b = UIButton(type: .system)
-        b.setTitle(title, for: .normal)
-        b.setTitleColor(Theme.text, for: .normal)
-        b.backgroundColor = Theme.card
-        b.layer.cornerRadius = 10
-        b.addTarget(self, action: selector, for: .touchUpInside)
-        return b
-    }
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        return f
+    }()
 
-    private func toastLayer(_ label: UILabel) {
-        label.layer.cornerRadius = 8
-        label.clipsToBounds = true
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.textAlignment = .center
-        view.addSubview(label)
-    }
+    // MARK: - 键盘避让
 
-    private func toast(_ text: String) {
-        toastLabel.text = " \(text) "
-        UIView.animate(withDuration: 0.2) { self.toastLabel.alpha = 1 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
-            UIView.animate(withDuration: 0.3) { self?.toastLabel.alpha = 0 }
+    private func setupKeyboardAvoidance() {
+        let willShow = NotificationCenter.default.addObserver(
+            forName: UIApplication.keyboardWillChangeFrameNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self, let info = note.userInfo,
+                  let end = (info[UIApplication.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
+            let overlap = max(0, self.view.bounds.maxY - self.view.convert(end, from: nil).minY)
+            UIView.animate(withDuration: 0.25) {
+                self.scrollView.contentInset.bottom = overlap
+                self.scrollView.verticalScrollIndicatorInsets.bottom = overlap
+            }
+            if overlap > 0, self.inputUrl.isFirstResponder {
+                self.scrollView.scrollRectToVisible(self.inputUrl.frame.insetBy(dx: -10, dy: -10), animated: true)
+            }
         }
+        keyboardObservers.append(willShow)
+        let willHide = NotificationCenter.default.addObserver(
+            forName: UIApplication.keyboardWillHideNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            UIView.animate(withDuration: 0.25) {
+                self.scrollView.contentInset.bottom = 0
+                self.scrollView.verticalScrollIndicatorInsets.bottom = 0
+            }
+        }
+        keyboardObservers.append(willHide)
+    }
+
+    deinit {
+        keyboardObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     // MARK: - 动作
@@ -198,7 +363,6 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
             openUrl(text)
         } else {
             inputUrl.text = text
-            inputUrl.becomeFirstResponder()
         }
     }
 
@@ -217,6 +381,11 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
         }
     }
 
+    @objc private func openSettingsUI() {
+        let vc = SettingsViewController { }
+        present(UINavigationController(rootViewController: vc), animated: true)
+    }
+
     private func presentScanner() {
         let vc = QRScannerViewController()
         vc.modalPresentationStyle = .fullScreen
@@ -232,6 +401,26 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
         textField.resignFirstResponder()
         onOpen()
         return true
+    }
+
+    @objc private func onRecentTap(_ sender: UIControl) {
+        guard recents.indices.contains(sender.tag) else { return }
+        openUrl(recents[sender.tag].url)
+    }
+
+    @objc private func onRecentDelete(_ sender: UIButton) {
+        let idx = sender.tag
+        guard recents.indices.contains(idx) else { return }
+        let item = recents[idx]
+        let alert = UIAlertController(
+            title: "删除最近会话？", message: item.displayLabel(), preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.store.remove(item.url)
+            self?.refreshRecents()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
     }
 
     /// 冷启动时如果最近有会话，直接进入，省去每次再点一下
@@ -273,11 +462,14 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
 
     private func refreshRecents() {
         recents = store.load()
+        recentsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for r in recents {
+            recentsStack.addArrangedSubview(buildRecentCard(r))
+        }
         let empty = recents.isEmpty
-        recentsHeader.isHidden = empty
+        recentsStack.isHidden = empty
         recentsEmpty.isHidden = !empty
-        tableView.isHidden = empty
-        tableView.reloadData()
+        recentsTitleRow.isHidden = false
     }
 
     private func requestNotifPermissionOnce() {
@@ -286,49 +478,12 @@ final class EntryViewController: UIViewController, UITableViewDataSource, UITabl
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
-    // MARK: - 表格
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { recents.count }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        let r = recents[indexPath.row]
-        var cfg = cell.defaultContentConfiguration()
-        cfg.text = r.displayLabel()
-        cfg.textProperties.color = Theme.text
-        cfg.textProperties.font = .systemFont(ofSize: 15, weight: .medium)
-        cfg.secondaryText = r.url
-        cfg.secondaryTextProperties.color = Theme.textSecondary
-        cfg.secondaryTextProperties.font = .systemFont(ofSize: 11)
-        cfg.secondaryTextProperties.lineBreakMode = .byTruncatingMiddle
-        cfg.textToSecondaryTextVerticalPadding = 4
-        cell.contentConfiguration = cfg
-        cell.backgroundColor = Theme.card
-        return cell
-    }
-
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        openUrl(recents[indexPath.row].url)
-    }
-
-    func tableView(_ tableView: UITableView,
-                   trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        let item = recents[indexPath.row]
-        let del = UIContextualAction(style: .destructive, title: "删除") { [weak self] _, _, done in
-            let alert = UIAlertController(
-                title: "删除最近会话？", message: item.displayLabel(), preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "删除", style: .destructive) { _ in
-                self?.store.remove(item.url)
-                self?.refreshRecents()
-            })
-            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            self?.present(alert, animated: true)
-            done(false)
+    private func toast(_ text: String) {
+        toastLabel.text = " \(text) "
+        UIView.animate(withDuration: 0.2) { self.toastLabel.alpha = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            UIView.animate(withDuration: 0.3) { self?.toastLabel.alpha = 0 }
         }
-        del.backgroundColor = Theme.destructive
-        return UISwipeActionsConfiguration(actions: [del])
     }
 
     private static func looksLikeRemoteLink(_ url: String) -> Bool {
