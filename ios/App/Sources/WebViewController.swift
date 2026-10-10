@@ -239,15 +239,38 @@ final class WebViewController: UIViewController {
         ucc.addUserScript(WKUserScript(source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
     }
 
-    /// 拉取页面侧诊断（注入状态/内部错误收集器/关键节点），与原生 Trace 拼接后展示
+    /// 拉取页面侧诊断（注入状态/内部错误收集器/关键节点 + v4 结构取证），与原生 Trace 拼接后展示
     func collectPageDiagnostics(_ done: @escaping (String) -> Void) {
         guard let wv = webView else {
             done(Trace.shared.jsonString())
             return
         }
-        let js = "JSON.stringify({boot:window.__zcBoot||null,ran:!!window.__zcRan," +
-            "errs:(window.__zcodeErrors||[]).slice(-8),api:!!window.__zcodeAPI," +
-            "icon:!!document.getElementById('zcode-composer-icon'),rs:document.readyState})"
+        let js = """
+        (function(){
+          function q(s){ try { return !!document.querySelector(s); } catch(e){ return false; } }
+          var tids = [];
+          try {
+            document.querySelectorAll('[data-testid]').forEach(function(el){
+              var t = el.getAttribute('data-testid');
+              if (t && tids.indexOf(t) < 0 && tids.length < 24) { tids.push(t); }
+            });
+          } catch(e){}
+          var cls = [];
+          try {
+            document.documentElement.classList.forEach(function(c){
+              if (c.indexOf('zcode') === 0 && cls.length < 12) { cls.push(c); }
+            });
+          } catch(e){}
+          return JSON.stringify({
+            boot: window.__zcBoot || null, ran: !!window.__zcRan,
+            errs: (window.__zcodeErrors || []).slice(-8), api: !!window.__zcodeAPI,
+            icon: !!document.getElementById('zcode-composer-icon'), rs: document.readyState,
+            dock: q('[data-v4-composer-dock="true"]'), dockAny: q('[data-v4-composer-dock]'),
+            composer: q('[data-testid="v4-composer"]'), rows: document.querySelectorAll('[data-testid^="v4-row"]').length,
+            tids: tids, zcls: cls, floatOn: !!document.documentElement.classList.contains('zcode-float-on')
+          });
+        })()
+        """
         wv.evaluateJavaScript(js) { result, _ in
             let page = (result as? String) ?? "{}"
             done(Trace.shared.jsonString() + "\n\n页面侧: " + page)
