@@ -93,6 +93,16 @@ final class SettingsStore {
         set { d.set(newValue, forKey: K.bareWebview) }
     }
 
+    /// 注入档位（诊断二分用）：full=完整增强；minimal=只装桥+埋点不注增强
+    var injectLevel: InjectLevel {
+        get { InjectLevel(rawValue: d.string(forKey: K.injectLevel) ?? "") ?? .full }
+        set { d.set(newValue.rawValue, forKey: K.injectLevel) }
+    }
+
+    enum InjectLevel: String {
+        case full, minimal
+    }
+
     /// 浮动 logo 位置（比例坐标；v65 起 logo 已移除，字段保留兼容桥接口）
     var logoPosSet: Bool {
         get { bool(K.logoPosSet, false) }
@@ -121,6 +131,7 @@ final class SettingsStore {
         static let sendMinimize = "send_minimize"
         static let amoledBlack = "amoled_black"
         static let bareWebview = "bare_webview"
+        static let injectLevel = "inject_level"
         static let logoPosSet = "logo_pos_set"
         static let logoX = "logo_x"
         static let logoY = "logo_y"
