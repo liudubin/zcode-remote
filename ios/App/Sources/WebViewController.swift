@@ -205,14 +205,26 @@ final class WebViewController: UIViewController {
             ucc.addUserScript(WKUserScript(source: prelude, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         }
 
-        // documentEnd：引导脚本（与 Android injectMobileFix 的注入串同构）。
-        // injectLevel 三档：full=完整增强；minimal=只装桥+埋点（定位增强层问题用）；
-        // bare=纯 WebView（bareWebview，上面已 return）。
-        // noBroadcast：WKWebView 真会话页 shadow root 多，递归广播注入会拖死页面（实机白屏卡骨架），
-        // iOS 只增强主文档；Android 端不传 opts 保持全量广播。
+        // documentEnd：引导脚本（与 Android injectMobileFix 同构，但注入时机不同——
+        // Android 在 onPageFinished（页面完全加载后）注入；ZCode 会话页是 React SPA，
+        // documentEnd 时 hydration 进行中，此时增强层改 DOM 会引发水合冲突（实机白屏无错误）。
+        // iOS 改为：documentEnd 只装桥/写全局变量并安排任务，页面 load 完成 + 1.2s 后才执行
+        // 增强（4s 兜底定时器防 load 事件不触发）。对齐 Android 的"后置注入"语义。
         let fullCall = """
-        var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
-        try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); } catch (e) { window.zcodeBridge && window.zcodeBridge.jsError('bundle:'+String(e && e.message || e).slice(0,140)); }
+        function __zcGo(){
+          if (window.__zcRan) { return; }
+          window.__zcRan = true;
+          window.__zcBoot = { t: Date.now(), rs: document.readyState };
+          window.zcodeBridge && window.zcodeBridge.jsError('go:full');
+          var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
+          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); }
+          catch (e) { window.zcodeBridge && window.zcodeBridge.jsError('bundle:' + String(e && e.message || e).slice(0, 140)); }
+        }
+        if (document.readyState === 'complete') { setTimeout(__zcGo, 1200); }
+        else {
+          window.addEventListener('load', function(){ setTimeout(__zcGo, 1200); });
+          setTimeout(__zcGo, 4000);
+        }
         """
         let bootstrap = """
         (function(){
@@ -225,6 +237,21 @@ final class WebViewController: UIViewController {
         })();
         """
         ucc.addUserScript(WKUserScript(source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
+    }
+
+    /// 拉取页面侧诊断（注入状态/内部错误收集器/关键节点），与原生 Trace 拼接后展示
+    func collectPageDiagnostics(_ done: @escaping (String) -> Void) {
+        guard let wv = webView else {
+            done(Trace.shared.jsonString())
+            return
+        }
+        let js = "JSON.stringify({boot:window.__zcBoot||null,ran:!!window.__zcRan," +
+            "errs:(window.__zcodeErrors||[]).slice(-8),api:!!window.__zcodeAPI," +
+            "icon:!!document.getElementById('zcode-composer-icon'),rs:document.readyState})"
+        wv.evaluateJavaScript(js) { result, _ in
+            let page = (result as? String) ?? "{}"
+            done(Trace.shared.jsonString() + "\n\n页面侧: " + page)
+        }
     }
 
     private func resourceString(_ name: String) -> String? {
@@ -326,9 +353,10 @@ final class WebViewController: UIViewController {
     }
 
     @objc private func openSettingsUI() {
-        let vc = SettingsViewController { [weak self] in
-            self?.applySettingsIfChanged()
-        }
+        let vc = SettingsViewController(
+            onChange: { [weak self] in self?.applySettingsIfChanged() },
+            diagnostics: { [weak self] done in self?.collectPageDiagnostics(done) }
+        )
         present(UINavigationController(rootViewController: vc), animated: true)
     }
 
