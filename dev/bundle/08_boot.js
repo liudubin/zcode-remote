@@ -2,7 +2,7 @@
   // ---------- 顶层执行 ----------
   // BODY 包 try/catch：注入失败不静默（错误进 __zcodeErrors，诊断卡可查）
   try {
-    BODY(css, navOn, replyOn, floatInput, uiAnim);
+    BODY(css, navOn, replyOn, floatInput, uiAnim, opts);
   } catch (e) {
     try {
       var _errs = window.__zcodeErrors || (window.__zcodeErrors = []);
@@ -13,14 +13,18 @@
   // ---------- 广播到同源 iframe / shadow DOM ----------
   // 事件驱动：MutationObserver 捕获新增 iframe、attachShadow 补丁记录新 shadow root，出现即广播；
   // 30s 低频全扫兜底迟加载。不再每 5s 全文档扫描（querySelectorAll('*') 是大文档的遍历大头）。
+  // iOS/WKWebView（opts.noBroadcast）：真会话页 shadow root 多，逐个注入完整增强层
+  // 会拖垮/破坏页面渲染（实机白屏卡骨架），跳过广播只保留主文档增强。
+  var NO_BROADCAST = !!(opts && opts.noBroadcast);
   var knownFrames = {}, knownShadows = {};
+  var OPT_ARG = opts ? JSON.stringify(opts) : 'undefined';
   function broadcastFrame(f){
     try {
       if (knownFrames[f]) { return; }
       knownFrames[f] = true;
       if (f.contentWindow && f.contentWindow.eval) {
         if (!(f.contentDocument && f.contentDocument.__zcodeDone)) {
-          f.contentWindow.eval('(' + BODY.toString() + ')(' + JSON.stringify(css) + ',' + navOn + ',' + replyOn + ',' + floatInput + ',' + uiAnim + ')');
+          f.contentWindow.eval('(' + BODY.toString() + ')(' + JSON.stringify(css) + ',' + navOn + ',' + replyOn + ',' + floatInput + ',' + uiAnim + ',' + OPT_ARG + ')');
         }
         // 递归一层：帧内再嵌套的 iframe/shadow 也覆盖到
         var fd = f.contentDocument;
@@ -39,10 +43,11 @@
       knownShadows[sr] = true;
       var prev = window.__zcodeRoot;
       window.__zcodeRoot = sr;
-      try { BODY(css, navOn, replyOn, floatInput, uiAnim); } catch (e) {}
+      try { BODY(css, navOn, replyOn, floatInput, uiAnim, opts); } catch (e) {}
       window.__zcodeRoot = prev;
     }, 0);
   }
+  if (!NO_BROADCAST) {
   try {
     new MutationObserver(function(muts){
       for (var i = 0; i < muts.length; i++) {
@@ -76,4 +81,5 @@
       for (var j = 0; j < all4.length; j++) { if (all4[j].shadowRoot) { queueShadow(all4[j].shadowRoot); } }
     } catch (e) {}
   }, 30000);
+  } // end if (!NO_BROADCAST)
 }
