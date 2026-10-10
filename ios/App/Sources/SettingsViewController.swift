@@ -73,6 +73,7 @@ final class SettingsViewController: UITableViewController {
 
             (Section.about, Row(title: "禁用注入增强层", subtitle: "诊断：连不上时对照，改后重进",
                                 boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
+            (Section.about, Row(title: "更新日志", subtitle: nil, boolKey: nil, segmented: nil)),
             (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品 · 链接即凭证，仅存本机", boolKey: nil, segmented: nil)),
         ]
     }
@@ -147,9 +148,19 @@ final class SettingsViewController: UITableViewController {
             }, for: .valueChanged)
             cell.accessoryView = seg
             cell.selectionStyle = .none
+        } else if row.title == "更新日志" {
+            cell.selectionStyle = .default
+            cell.accessoryType = .disclosureIndicator
         } else {
             cell.selectionStyle = .none
         }
         return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let row = rows(in: sectionOrder[indexPath.section])[indexPath.row].1
+        guard row.title == "更新日志" else { return }
+        tableView.deselectRow(at: indexPath, animated: true)
+        navigationController?.pushViewController(ChangelogViewController(), animated: true)
     }
 }
