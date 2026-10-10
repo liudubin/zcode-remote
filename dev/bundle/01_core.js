@@ -1,6 +1,7 @@
 // ===== 01_core.js (1-66) =====
-function(css, navOn, replyOn, floatInput, uiAnim){
-  var BODY = function(css, navOn, replyOn, floatInput, uiAnim){
+function(css, navOn, replyOn, floatInput, uiAnim, opts){
+  var BODY = function(css, navOn, replyOn, floatInput, uiAnim, opts){
+    // opts.noBroadcast 由 08_boot 消费（iOS/WKWebView 跳过 iframe/shadow 递归广播，只增强主文档）
     var root = window.__zcodeRoot || document;
     var doc = root.ownerDocument || document;
     var isShadow = !!root.host;
