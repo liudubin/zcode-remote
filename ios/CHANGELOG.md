@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios71
+
+- feat(ios): 注入诊断升级 DOM 取证——dock/composer/消息行存在性、页面全部 data-testid 清单、zcode 状态类、floatOn
+
 ## 0.0.2-ios69
 
 - fix(ios): 升级自动重置诊断档位——注入档位回'完整'、解除禁用注入,避免困在诊断模式
