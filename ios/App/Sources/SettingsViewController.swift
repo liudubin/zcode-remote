@@ -74,6 +74,7 @@ final class SettingsViewController: UITableViewController {
             (Section.about, Row(title: "禁用注入增强层", subtitle: "诊断：连不上时对照，改后重进",
                                 boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
             (Section.about, Row(title: "更新日志", subtitle: nil, boolKey: nil, segmented: nil)),
+            (Section.about, Row(title: "注入诊断", subtitle: "最近的注入/页面错误与回复链路事件", boolKey: nil, segmented: nil)),
             (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品 · 链接即凭证，仅存本机", boolKey: nil, segmented: nil)),
         ]
     }
@@ -148,7 +149,7 @@ final class SettingsViewController: UITableViewController {
             }, for: .valueChanged)
             cell.accessoryView = seg
             cell.selectionStyle = .none
-        } else if row.title == "更新日志" {
+        } else if row.title == "更新日志" || row.title == "注入诊断" {
             cell.selectionStyle = .default
             cell.accessoryType = .disclosureIndicator
         } else {
@@ -159,8 +160,19 @@ final class SettingsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let row = rows(in: sectionOrder[indexPath.section])[indexPath.row].1
-        guard row.title == "更新日志" else { return }
+        guard row.title == "更新日志" || row.title == "注入诊断" else { return }
         tableView.deselectRow(at: indexPath, animated: true)
-        navigationController?.pushViewController(ChangelogViewController(), animated: true)
+        if row.title == "更新日志" {
+            navigationController?.pushViewController(ChangelogViewController(), animated: true)
+            return
+        }
+        // 注入诊断：Trace 最近 6 条事件（jsError/onReply/dedup/notified…）
+        let trace = Trace.shared.jsonString()
+        let alert = UIAlertController(title: "注入诊断（最近事件）", message: trace, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
+            UIPasteboard.general.string = trace
+        })
+        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+        present(alert, animated: true)
     }
 }
