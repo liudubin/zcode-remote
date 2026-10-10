@@ -271,10 +271,30 @@ final class WebViewController: UIViewController {
         return "document.documentElement.style.webkitTextSizeAdjust='\(z)%';"
     }
 
-    /// 设置即时生效：设置页返回时重挂脚本 + 热更新当前页（不重进会话）
+    /// 上次已应用的设置快照（对齐 Android 的 applied 机制）：
+    /// 设置没变就绝不触碰页面——之前每次关设置页都无条件重挂脚本+热更新，
+    /// 在 WKWebView 上正是下滑关闭设置后白屏的触发点。
+    private var appliedKey: String?
+
+    private func currentKey() -> String {
+        let s = settings
+        return [
+            s.hideScrollbar, s.turnNavigator, s.notifyReply, s.floatingInput,
+            s.restoreOnBottom, s.sendMinimize, s.amoledBlack,
+            s.bareWebview, s.injectLevel == .full, s.textZoom,
+        ].map { String($0) }.joined(",")
+    }
+
+    /// 设置即时生效：设置页返回时对比快照，有变化才重挂脚本+热更新当前页
     func applySettingsIfChanged() {
         guard webView != nil else { return }
+        let key = currentKey()
+        guard key != appliedKey else { return }
+        let firstApply = appliedKey == nil
+        appliedKey = key
         installBootstrap(into: webView.configuration.userContentController)
+        // 首次应用发生在会话加载前（bootstrap 已带上当前值），无需热更新
+        guard !firstApply else { return }
         let s = settings
         let js = "window.__zcodeAPI && window.__zcodeAPI.applySettings({" +
             "\"scrollbar\":\(s.hideScrollbar)," +
