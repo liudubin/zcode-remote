@@ -71,6 +71,10 @@ final class SettingsViewController: UITableViewController {
                                                  get: { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
                                                  set: { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
 
+            (Section.about, Row(title: "注入档位（诊断）", subtitle: "最小=只装桥不注增强，改后重进会话", boolKey: nil,
+                                segmented: (items: ["完整", "最小"],
+                                            get: { self.settings.injectLevel == .full ? 0 : 1 },
+                                            set: { self.settings.injectLevel = $0 == 0 ? .full : .minimal }))),
             (Section.about, Row(title: "禁用注入增强层", subtitle: "诊断：连不上时对照，改后重进",
                                 boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
             (Section.about, Row(title: "更新日志", subtitle: nil, boolKey: nil, segmented: nil)),
