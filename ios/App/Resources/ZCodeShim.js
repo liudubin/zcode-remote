@@ -13,11 +13,15 @@ function __zcodeInstallBridge(logoPos, nativeTrace) {
   if (window.zcodeBridge) { return; }
   window.__zcodeNativeTrace = nativeTrace || '[]';
   window.__zcodeLogoPos = logoPos || '';
+  // 防御式探测：shim 在任何页面都要能活（webkit 命名空间异常不致命）
+  var handlers = null;
+  try { handlers = window.webkit && window.webkit.messageHandlers; } catch (e) {}
   function post(fn) {
     return function () {
+      if (!handlers || !handlers.zcodeBridge) { return; }
       var args = Array.prototype.slice.call(arguments);
       try {
-        window.webkit.messageHandlers.zcodeBridge.postMessage({ fn: fn, args: args });
+        handlers.zcodeBridge.postMessage({ fn: fn, args: args });
       } catch (e) {}
     };
   }
