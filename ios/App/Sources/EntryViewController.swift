@@ -227,6 +227,10 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         recentsTitleRow.axis = .horizontal
         recentsTitleRow.alignment = .center
         recentsTitleRow.addArrangedSubview(recentsHeader)
+        // spacer 把"设置"推到最右（否则紧贴标题，视觉错位）
+        let spacer = UIView()
+        spacer.setContentHuggingPriority(.init(249), for: .horizontal)
+        recentsTitleRow.addArrangedSubview(spacer)
         recentsTitleRow.addArrangedSubview(clearAll)
 
         recentsStack.axis = .vertical
@@ -255,14 +259,15 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         return foot
     }
 
-    /// 一张最近会话卡片：名字 + 域名/时间 + 删除×
+    /// 一张最近会话卡片：名字 + 域名/时间 + 删除×。
+    /// 点击走 UITapGestureRecognizer（UIControl 方案被内容 UIStackView 拦截 hit-test，
+    /// 实机点不动）；删除按钮独立挂在卡片上，优先于手势响应。
     private func buildRecentCard(_ r: Recent) -> UIView {
-        let card = UIControl()
+        let card = UIView()
         card.backgroundColor = Theme.card
         card.layer.cornerRadius = 12
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.addTarget(self, action: #selector(onRecentTap(_:)), for: .touchUpInside)
-        card.tag = recentsStack.arrangedSubviews.count
+        let idx = recentsStack.arrangedSubviews.count
 
         let title = UILabel()
         title.text = r.displayLabel()
@@ -281,17 +286,18 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         texts.addArrangedSubview(title)
         texts.addArrangedSubview(sub)
 
-        let del = UIButton(type: .system)
-        del.setTitle("×", for: .normal)
-        del.setTitleColor(Theme.textSecondary, for: .normal)
-        del.titleLabel?.font = .systemFont(ofSize: 18)
-        del.tag = card.tag
-        del.addTarget(self, action: #selector(onRecentDelete(_:)), for: .touchUpInside)
-
         let chevron = UILabel()
         chevron.text = "›"
         chevron.textColor = Theme.textSecondary
         chevron.font = .systemFont(ofSize: 18)
+
+        let del = UIButton(type: .system)
+        del.setTitle("×", for: .normal)
+        del.setTitleColor(Theme.textSecondary, for: .normal)
+        del.titleLabel?.font = .systemFont(ofSize: 20)
+        del.tag = idx
+        del.addTarget(self, action: #selector(onRecentDelete(_:)), for: .touchUpInside)
+        del.translatesAutoresizingMaskIntoConstraints = false
 
         let row = UIStackView()
         row.axis = .horizontal
@@ -300,15 +306,24 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         row.layoutMargins = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
         row.isLayoutMarginsRelativeArrangement = true
         row.translatesAutoresizingMaskIntoConstraints = false
+        texts.setContentHuggingPriority(.init(249), for: .horizontal)
         row.addArrangedSubview(texts)
         row.addArrangedSubview(chevron)
-        row.addArrangedSubview(del)
         card.addSubview(row)
+        card.addSubview(del)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(onRecentTap(_:)))
+        card.addGestureRecognizer(tap)
+
+        card.tag = idx
         NSLayoutConstraint.activate([
             row.topAnchor.constraint(equalTo: card.topAnchor),
             row.bottomAnchor.constraint(equalTo: card.bottomAnchor),
             row.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            row.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            row.trailingAnchor.constraint(equalTo: del.leadingAnchor, constant: -6),
+            del.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+            del.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            del.widthAnchor.constraint(equalToConstant: 34),
         ])
         return card
     }
@@ -403,9 +418,9 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         return true
     }
 
-    @objc private func onRecentTap(_ sender: UIControl) {
-        guard recents.indices.contains(sender.tag) else { return }
-        openUrl(recents[sender.tag].url)
+    @objc private func onRecentTap(_ sender: UITapGestureRecognizer) {
+        guard let tag = sender.view?.tag, recents.indices.contains(tag) else { return }
+        openUrl(recents[tag].url)
     }
 
     @objc private func onRecentDelete(_ sender: UIButton) {
