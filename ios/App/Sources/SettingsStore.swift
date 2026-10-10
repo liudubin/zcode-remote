@@ -5,7 +5,15 @@ final class SettingsStore {
     static let shared = SettingsStore()
     private let d = UserDefaults.standard
 
-    private init() {}
+    private init() {
+        // 一次性迁移：诊断档位是排障用的临时状态，升级后自动回到完整档
+        // （避免用户困在最小档/纯 WebView 模式，增强功能"莫名消失"）
+        if !d.bool(forKey: "diag_reset_auto") {
+            d.set(true, forKey: "diag_reset_auto")
+            if injectLevel == .minimal { injectLevel = .full }
+            if bareWebview { bareWebview = false }
+        }
+    }
 
     private func bool(_ key: String, _ def: Bool) -> Bool {
         d.object(forKey: key) == nil ? def : d.bool(forKey: key)
