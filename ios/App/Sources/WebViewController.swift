@@ -203,14 +203,16 @@ final class WebViewController: UIViewController {
             ucc.addUserScript(WKUserScript(source: prelude, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         }
 
-        // documentEnd：引导脚本（与 Android injectMobileFix 的注入串同构）
+        // documentEnd：引导脚本（与 Android injectMobileFix 的注入串同构）。
+        // noBroadcast：WKWebView 真会话页 shadow root 多，递归广播注入会拖死页面（实机白屏卡骨架），
+        // iOS 只增强主文档；Android 端不传 opts 保持全量广播。
         let bootstrap = """
         (function(){
           __zcodeInstallBridge(\(jsString(logoPosValue())), \(jsString(Trace.shared.jsonString())));
           window.__zcodeSafeB=\(lastSafeB);
           window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack)};
           var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
-          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true); } catch (e) {}
+          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); } catch (e) {}
           \(textZoomJS())
         })();
         """
@@ -384,6 +386,10 @@ extension WebViewController: WKScriptMessageHandler {
             settings.logoY = double(args, 1)
         case "setGestureExclude":
             break // iOS 无系统手势豁免需求，接受即忽略
+        case "jsError":
+            // shim 上报的页面/注入层 JS 错误（注入诊断用）
+            Trace.shared.record("jsError", str(args, 0), "")
+            log.error("jsError \(str(args, 0), privacy: .public)")
         default:
             break
         }
