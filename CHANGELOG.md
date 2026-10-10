@@ -4,6 +4,9 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [v0.0.2-ios67 · iOS] — 2026-10-10
+
+- 例行构建发布
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。
