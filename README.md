@@ -79,25 +79,30 @@ ZCodeRemote 解决这些问题：**悬浮输入框**（键盘挡不住）、**�
 
 ## 下载安装
 
-### 方式一：GitHub Releases（推荐）
+### iOS 版(本仓库维护)
 
-前往 [Releases 页面](https://github.com/Enc-hanted/zcode-remote/releases)，下载最新的 `ZCodeRemote-vX.X.X.apk`，在手机上安装。
+前往 [Releases 页面](https://github.com/liudubin/zcode-remote/releases),下载最新的 `com.zcode.remote_…_iphoneos-arm64e.deb`(roothide 越狱设备,Sileo 直接安装或 `dpkg -i`,覆盖升级)或 `ZCodeRemote-…-unsigned.ipa`(TrollStore/越狱直装)。
 
-> 安装时系统会提示「未知来源应用」——这是 Android 对非 Play 商店应用的常规提示，允许安装即可。APK 由 GitHub Actions 在 CI 上构建，签名使用公开默认参数的 debug keystore，可直接覆盖升级。
+### Android 版(上游官方)
 
-### 方式二：自行构建
+Android APK 由上游仓库 [Enc-hanted/zcode-remote](https://github.com/Enc-hanted/zcode-remote) 维护发布,请前往其 [Releases](https://github.com/Enc-hanted/zcode-remote/releases) 下载;本仓库不再打包 Android。
+
+### 自行构建 iOS
 
 ```bash
-git clone https://github.com/Enc-hanted/zcode-remote.git
+git clone https://github.com/liudubin/zcode-remote.git
 cd zcode-remote
-# 重新拼接注入包并校验（CI 同款流程）
-python3 _patch_web2.py
+python3 _patch_web2.py            # 重拼注入包并内嵌(CI 校验用)
 python3 _validate.py
-gradle assembleDebug
-# 产物：app/build/outputs/apk/debug/app-debug.apk
+python3 ios/tools/build_bundle.py # 生成 iOS 注入资源
+brew install xcodegen ldid        # 仅 macOS 需要
+cd ios && xcodegen generate
+xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build
 ```
 
-需要 JDK 17 和 Gradle 8.9。详细开发流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+或直接推送到仓库,CI(`.github/workflows/ios.yml`)自动构建并产出 IPA 与 roothide deb,详见 [ios/README.md](ios/README.md)。
 
 ### 方式三：iOS 版（越狱设备侧载）
 
