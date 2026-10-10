@@ -29,7 +29,22 @@ function __zcodeInstallBridge(logoPos, nativeTrace) {
     openSettings: post('openSettings'),
     saveLogoPos: post('saveLogoPos'),
     setGestureExclude: post('setGestureExclude'),
+    jsError: post('jsError'),
     getLogoPos: function () { return window.__zcodeLogoPos || ''; },
     getTrace: function () { return window.__zcodeNativeTrace || '[]'; }
   };
+  // 页面 JS 错误上报（独立于注入 bundle：bundle 崩溃/页面自身崩溃都能报给原生）
+  try {
+    window.addEventListener('error', function (ev) {
+      try {
+        window.zcodeBridge.jsError(String((ev && ev.message || 'err')).slice(0, 160) +
+          '@' + String((ev && ev.filename || '?')).slice(-40) + ':' + (ev && ev.lineno || 0));
+      } catch (e) {}
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      try {
+        window.zcodeBridge.jsError('rejection:' + String((ev && ev.reason && (ev.reason.message || ev.reason)) || '').slice(0, 160));
+      } catch (e) {}
+    });
+  } catch (e) {}
 }
