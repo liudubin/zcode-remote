@@ -1,5 +1,10 @@
 # 更新日志
 
+## 0.0.2-ios75
+
+- fix(ios): os_log 无插值字符串不能带 privacy 参数
+- fix(ios): WebContent 进程被杀后整页重载——恢复的页面不重跑注入脚本,增强层凭空消失的根因
+
 ## 0.0.2-ios71
 
 - feat(ios): 注入诊断升级 DOM 取证——dock/composer/消息行存在性、页面全部 data-testid 清单、zcode 状态类、floatOn
