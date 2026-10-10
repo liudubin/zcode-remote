@@ -198,21 +198,29 @@ final class WebViewController: UIViewController {
         // documentStart：shim + 生成物（CSS 常量 + bundle 函数），纯定义无副作用
         var prelude = ""
         if let shim = resourceString("ZCodeShim") { prelude += shim + "\n" }
-        if let bundle = resourceString("ZCodeBundle") { prelude += bundle + "\n" }
+        if settings.injectLevel != .minimal {
+            if let bundle = resourceString("ZCodeBundle") { prelude += bundle + "\n" }
+        }
         if !prelude.isEmpty {
             ucc.addUserScript(WKUserScript(source: prelude, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         }
 
         // documentEnd：引导脚本（与 Android injectMobileFix 的注入串同构）。
+        // injectLevel 三档：full=完整增强；minimal=只装桥+埋点（定位增强层问题用）；
+        // bare=纯 WebView（bareWebview，上面已 return）。
         // noBroadcast：WKWebView 真会话页 shadow root 多，递归广播注入会拖死页面（实机白屏卡骨架），
         // iOS 只增强主文档；Android 端不传 opts 保持全量广播。
+        let fullCall = """
+        var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
+        try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); } catch (e) { window.zcodeBridge && window.zcodeBridge.jsError('bundle:'+String(e && e.message || e).slice(0,140)); }
+        """
         let bootstrap = """
         (function(){
           __zcodeInstallBridge(\(jsString(logoPosValue())), \(jsString(Trace.shared.jsonString())));
+          window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
           window.__zcodeSafeB=\(lastSafeB);
           window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack)};
-          var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
-          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); } catch (e) {}
+          \(settings.injectLevel == .full ? fullCall : "")
           \(textZoomJS())
         })();
         """
