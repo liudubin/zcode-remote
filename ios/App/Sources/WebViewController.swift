@@ -278,11 +278,13 @@ final class WebViewController: UIViewController {
 
     private func currentKey() -> String {
         let s = settings
-        return [
+        var parts: [String] = [
             s.hideScrollbar, s.turnNavigator, s.notifyReply, s.floatingInput,
             s.restoreOnBottom, s.sendMinimize, s.amoledBlack,
-            s.bareWebview, s.injectLevel == .full, s.textZoom,
-        ].map { String($0) }.joined(",")
+            s.bareWebview, s.injectLevel == .full,
+        ].map { String($0) }
+        parts.append(String(s.textZoom))
+        return parts.joined(separator: ",")
     }
 
     /// 设置即时生效：设置页返回时对比快照，有变化才重挂脚本+热更新当前页
