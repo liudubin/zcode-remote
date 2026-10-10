@@ -529,7 +529,7 @@ extension WebViewController: WKNavigationDelegate {
     /// user scripts——增强层会凭空消失（表现为回来后悬浮按钮没了、诊断 ran:false）。
     /// 处理：进程死亡回调直接整页重载，注入链路随之完整重建。
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        log.error("webContent terminated, reloading", privacy: .public)
+        log.error("webContent terminated, reloading")
         Trace.shared.record("webkill", "", "reload")
         webView.reload()
     }
