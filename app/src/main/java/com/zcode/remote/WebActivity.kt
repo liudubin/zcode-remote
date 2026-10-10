@@ -94,8 +94,9 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
          * 注意：JS 超长时拆多段字符串拼接（JVM 常量池单字符串限 65535 字节），段数见下方。
          */
         private val BUNDLE_JS =
-"""function(css, navOn, replyOn, floatInput, uiAnim){
-  var BODY = function(css, navOn, replyOn, floatInput, uiAnim){
+"""function(css, navOn, replyOn, floatInput, uiAnim, opts){
+  var BODY = function(css, navOn, replyOn, floatInput, uiAnim, opts){
+    // opts.noBroadcast 由 08_boot 消费（iOS/WKWebView 跳过 iframe/shadow 递归广播，只增强主文档）
     var root = window.__zcodeRoot || document;
     var doc = root.ownerDocument || document;
     var isShadow = !!root.host;
@@ -1018,10 +1019,10 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       var title = doc.createElement('div');
       title.textContent = '页面结构诊断';
       title.style.cssText = 'font-size:13px;font-weight:600;color:var(--zc-text-2);margin-bottom:8px;';
-      var pre = doc.createElement('div');
-      pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;';
 """ +
-"""      pre.textContent = text;
+"""      var pre = doc.createElement('div');
+      pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;';
+      pre.textContent = text;
       var copy = doc.createElement('div');
       copy.textContent = '复制诊断';
       copy.style.cssText = 'margin-top:10px;text-align:center;color:var(--zc-text-2);background:rgba(255,255,255,0.10);' +
@@ -2156,12 +2157,12 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       try {
         var all = doc.querySelectorAll(PAGE_POPUP_SEL);
         for (var i = 0; i < all.length; i++) {
-          if (isPagePopup(all[i])) { found = true; break; }
+""" +
+"""          if (isPagePopup(all[i])) { found = true; break; }
         }
       } catch (e) {}
       var html = doc.documentElement;
-""" +
-"""      if (!html) { return; }   // shadow root 没有 documentElement
+      if (!html) { return; }   // shadow root 没有 documentElement
       if (found) { html.classList.add('zcode-body-popup'); }
       else { html.classList.remove('zcode-body-popup'); }
     }
@@ -3193,12 +3194,12 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     var watchers = {};      // rowId -> { row, lastLen, stable, timer }
     var doneRows = {};      // rowId -> true（已报过，防重）
     function watchRow(row){
-      if (!replyActive) { return; }
+""" +
+"""      if (!replyActive) { return; }
       var rid = rowIdOf(row);
       if (!rid || watchers[rid] || doneRows[rid]) { return; }
       traceAdd('watch', rid, '');
-""" +
-"""      var w = { row: row, lastLen: -1, stable: 0, timer: null };
+      var w = { row: row, lastLen: -1, stable: 0, timer: null };
       watchers[rid] = w;
       function tick(){
         if (doneRows[rid]) { delete watchers[rid]; return; }
@@ -3345,7 +3346,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
   // ---------- 顶层执行 ----------
   // BODY 包 try/catch：注入失败不静默（错误进 __zcodeErrors，诊断卡可查）
   try {
-    BODY(css, navOn, replyOn, floatInput, uiAnim);
+    BODY(css, navOn, replyOn, floatInput, uiAnim, opts);
   } catch (e) {
     try {
       var _errs = window.__zcodeErrors || (window.__zcodeErrors = []);
@@ -3356,14 +3357,18 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
   // ---------- 广播到同源 iframe / shadow DOM ----------
   // 事件驱动：MutationObserver 捕获新增 iframe、attachShadow 补丁记录新 shadow root，出现即广播；
   // 30s 低频全扫兜底迟加载。不再每 5s 全文档扫描（querySelectorAll('*') 是大文档的遍历大头）。
+  // iOS/WKWebView（opts.noBroadcast）：真会话页 shadow root 多，逐个注入完整增强层
+  // 会拖垮/破坏页面渲染（实机白屏卡骨架），跳过广播只保留主文档增强。
+  var NO_BROADCAST = !!(opts && opts.noBroadcast);
   var knownFrames = {}, knownShadows = {};
+  var OPT_ARG = opts ? JSON.stringify(opts) : 'undefined';
   function broadcastFrame(f){
     try {
       if (knownFrames[f]) { return; }
       knownFrames[f] = true;
       if (f.contentWindow && f.contentWindow.eval) {
         if (!(f.contentDocument && f.contentDocument.__zcodeDone)) {
-          f.contentWindow.eval('(' + BODY.toString() + ')(' + JSON.stringify(css) + ',' + navOn + ',' + replyOn + ',' + floatInput + ',' + uiAnim + ')');
+          f.contentWindow.eval('(' + BODY.toString() + ')(' + JSON.stringify(css) + ',' + navOn + ',' + replyOn + ',' + floatInput + ',' + uiAnim + ',' + OPT_ARG + ')');
         }
         // 递归一层：帧内再嵌套的 iframe/shadow 也覆盖到
         var fd = f.contentDocument;
@@ -3382,10 +3387,11 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       knownShadows[sr] = true;
       var prev = window.__zcodeRoot;
       window.__zcodeRoot = sr;
-      try { BODY(css, navOn, replyOn, floatInput, uiAnim); } catch (e) {}
+      try { BODY(css, navOn, replyOn, floatInput, uiAnim, opts); } catch (e) {}
       window.__zcodeRoot = prev;
     }, 0);
   }
+  if (!NO_BROADCAST) {
   try {
     new MutationObserver(function(muts){
       for (var i = 0; i < muts.length; i++) {
@@ -3419,6 +3425,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       for (var j = 0; j < all4.length; j++) { if (all4[j].shadowRoot) { queueShadow(all4[j].shadowRoot); } }
     } catch (e) {}
   }, 30000);
+  } // end if (!NO_BROADCAST)
 }
 """
 }
