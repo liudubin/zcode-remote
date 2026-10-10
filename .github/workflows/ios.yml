@@ -156,7 +156,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(ls dist/*.deb | sed -E 's/.*remote_([0-9a-z.\-]+)_iphoneos.*/\1/')
-          # 已手写本版小节则跳过（顶节版本==本次）
+          # 已手写本版小节则跳过（ios/CHANGELOG 顶节版本==本次）
           TOP=$(awk '/^## /{print $2; exit}' ios/CHANGELOG.md)
           if [ "$TOP" = "$VER" ]; then
             echo "changelog already has $VER (hand-written), skip"
@@ -176,13 +176,29 @@ jobs:
           if ! grep -q '^- ' section.md; then
             echo "- 例行构建发布" >> section.md
           fi
+          # ① ios/CHANGELOG.md：顶部（# 更新日志 之后）
           awk -v sec="$(cat section.md)" '
             /^# 更新日志/ && !done { print; print ""; print sec; done=1; next }
             { print }' ios/CHANGELOG.md > CHANGELOG.new && mv CHANGELOG.new ios/CHANGELOG.md
+          # ② 根 CHANGELOG.md：[未发布] 节之前（Keep a Changelog 格式，iOS 小节带日期）
+          DATE=$(date +%Y-%m-%d)
+          {
+            echo "## [v$VER · iOS] — $DATE"
+            echo
+            tail -n +3 section.md
+            echo
+          } > root-section.md
+          if ! grep -qF "v$VER · iOS" CHANGELOG.md; then
+            awk -v sec="$(cat root-section.md)" '
+              /^## \[未发布\]/ && !done { print sec; done=1; print; next }
+              { print }' CHANGELOG.md > CHANGELOG.new && mv CHANGELOG.new CHANGELOG.md
+          fi
           head -8 ios/CHANGELOG.md
+          echo "---- root ----"
+          head -8 CHANGELOG.md
           git config user.name "zcode-remote-ci"
           git config user.email "ci@users.noreply.github.com"
-          git add ios/CHANGELOG.md
+          git add ios/CHANGELOG.md CHANGELOG.md
           git commit -q -m "docs: 更新日志自动生成 $VER [skip ci]" || true
           git push origin main
 
