@@ -21,6 +21,8 @@ targets:
       - path: App/Sources
       - path: App/Resources
         buildPhase: resources
+      - path: CHANGELOG.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zcode.remote
