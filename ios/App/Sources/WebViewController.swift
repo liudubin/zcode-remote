@@ -68,23 +68,24 @@ final class WebViewController: UIViewController {
         loadSession()
     }
 
-    /// 顶部工具条：毛玻璃占位式（返回 | 机器名 | 设置），WebView 从其下沿开始，互不遮挡
+    /// 顶部工具条：毛玻璃占位式（返回 | 机器名 | 设置），WebView 从其下沿开始，互不遮挡。
+    /// 按钮用 SF Symbol 图标 + 固定 44×44 触达区，位置不受标题长度挤压。
     private func buildTopBar() {
         let bar = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
         bar.backgroundColor = Theme.background.withAlphaComponent(0.6)
         bar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(bar)
 
+        let iconCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+
         let back = UIButton(type: .system)
-        back.setTitle("‹ 返回", for: .normal)
-        back.setTitleColor(Theme.accent, for: .normal)
-        back.titleLabel?.font = .systemFont(ofSize: 17, weight: .medium)
+        back.setImage(UIImage(systemName: "chevron.left", withConfiguration: iconCfg), for: .normal)
+        back.tintColor = Theme.accent
         back.addTarget(self, action: #selector(onBack), for: .touchUpInside)
 
         let gear = UIButton(type: .system)
-        gear.setTitle("设置", for: .normal)
-        gear.setTitleColor(Theme.accent, for: .normal)
-        gear.titleLabel?.font = .systemFont(ofSize: 15)
+        gear.setImage(UIImage(systemName: "gearshape", withConfiguration: iconCfg), for: .normal)
+        gear.tintColor = Theme.accent
         gear.addTarget(self, action: #selector(openSettingsUI), for: .touchUpInside)
 
         topTitle.text = machineLabel.isEmpty ? "ZCode 远控" : machineLabel
@@ -103,13 +104,15 @@ final class WebViewController: UIViewController {
             bar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bar.heightAnchor.constraint(equalToConstant: 44),
-            back.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 12),
+            back.leadingAnchor.constraint(equalTo: bar.contentView.leadingAnchor, constant: 4),
             back.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
-            gear.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -12),
+            back.widthAnchor.constraint(equalToConstant: 44),
+            gear.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -4),
             gear.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
+            gear.widthAnchor.constraint(equalToConstant: 44),
             topTitle.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
-            topTitle.leadingAnchor.constraint(equalTo: back.trailingAnchor, constant: 8),
-            topTitle.trailingAnchor.constraint(equalTo: gear.leadingAnchor, constant: -8),
+            topTitle.leadingAnchor.constraint(equalTo: back.trailingAnchor, constant: 4),
+            topTitle.trailingAnchor.constraint(equalTo: gear.leadingAnchor, constant: -4),
         ])
         topBar = bar
     }
