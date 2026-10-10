@@ -388,8 +388,9 @@ extension WebViewController: WKScriptMessageHandler {
             break // iOS 无系统手势豁免需求，接受即忽略
         case "jsError":
             // shim 上报的页面/注入层 JS 错误（注入诊断用）
-            Trace.shared.record("jsError", str(args, 0), "")
-            log.error("jsError \(str(args, 0), privacy: .public)")
+            let msg = str(args, 0)
+            Trace.shared.record("jsError", msg, "")
+            log.error("jsError \(msg, privacy: .public)")
         default:
             break
         }
