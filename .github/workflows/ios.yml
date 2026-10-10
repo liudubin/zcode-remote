@@ -133,20 +133,58 @@ jobs:
             smoke-log.txt
           retention-days: 30
 
-  # 发布：release=true 手动触发时，构建产物 + 更新日志最新一节 → GitHub Release
+  # 发布：release=true 手动触发时，自动生成更新日志小节 → 构建产物 → GitHub Release
   release:
     needs: [build, smoke]
     if: github.event_name == 'workflow_dispatch' && inputs.release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (CHANGELOG)
+      - name: Checkout (full history for changelog)
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: ZCodeRemote-ios
           path: dist
+
+      - name: Auto-append changelog section
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(ls dist/*.deb | sed -E 's/.*remote_([0-9a-z.\-]+)_iphoneos.*/\1/')
+          # 已手写本版小节则跳过（顶节版本==本次）
+          TOP=$(awk '/^## /{print $2; exit}' ios/CHANGELOG.md)
+          if [ "$TOP" = "$VER" ]; then
+            echo "changelog already has $VER (hand-written), skip"
+            exit 0
+          fi
+          # 上一 release tag 之后的提交首行 → 新小节
+          PREV=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          RANGE="${PREV:+$PREV..}HEAD"
+          {
+            echo "## $VER"
+            echo
+            git log "$RANGE" --no-merges --format='- %s' -- \
+              ios/ dev/bundle/ .github/workflows/ios.yml |
+              grep -vE '^- (docs|style|chore|ci):' | head -20
+          } > section.md
+          # 若无实质变更（空列表），至少记录版本行
+          if ! grep -q '^- ' section.md; then
+            echo "- 例行构建发布" >> section.md
+          fi
+          awk -v sec="$(cat section.md)" '
+            /^# 更新日志/ && !done { print; print ""; print sec; done=1; next }
+            { print }' ios/CHANGELOG.md > CHANGELOG.new && mv CHANGELOG.new ios/CHANGELOG.md
+          head -8 ios/CHANGELOG.md
+          git config user.name "zcode-remote-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add ios/CHANGELOG.md
+          git commit -q -m "docs: 更新日志自动生成 $VER [skip ci]" || true
+          git push origin main
 
       - name: Create release
         env:
