@@ -2,12 +2,16 @@ import UIKit
 
 /// 设置页：会话页外观 + 后台保活 + 通知（对应 Android SettingsActivity）。
 /// 每次变更即时回调 onChange → WebViewController 热更新页面，返回会话不用重进。
+/// diagnostics：会话内提供（异步拉取页面侧+原生 Trace）；入口页进入时无会话，置 nil。
 final class SettingsViewController: UITableViewController {
     private let settings = SettingsStore.shared
     private let onChange: () -> Void
+    private let diagnostics: ((@escaping (String) -> Void) -> Void)?
 
-    init(onChange: @escaping () -> Void) {
+    init(onChange: @escaping () -> Void,
+         diagnostics: ((@escaping (String) -> Void) -> Void)? = nil) {
         self.onChange = onChange
+        self.diagnostics = diagnostics
         super.init(style: .insetGrouped)
     }
 
@@ -170,13 +174,24 @@ final class SettingsViewController: UITableViewController {
             navigationController?.pushViewController(ChangelogViewController(), animated: true)
             return
         }
-        // 注入诊断：Trace 最近 6 条事件（jsError/onReply/dedup/notified…）
-        let trace = Trace.shared.jsonString()
-        let alert = UIAlertController(title: "注入诊断（最近事件）", message: trace, preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
-            UIPasteboard.general.string = trace
-        })
-        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
-        present(alert, animated: true)
+        // 注入诊断：原生 Trace + 页面侧状态（boot 时序/内部错误收集器/关键节点），异步拉取
+        if let fetch = diagnostics {
+            fetch { [weak self] text in
+                let alert = UIAlertController(title: "注入诊断", message: text, preferredStyle: .actionSheet)
+                alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
+                    UIPasteboard.general.string = text
+                })
+                alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+                self?.present(alert, animated: true)
+            }
+        } else {
+            let trace = Trace.shared.jsonString()
+            let alert = UIAlertController(title: "注入诊断（最近事件）", message: trace, preferredStyle: .actionSheet)
+            alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
+                UIPasteboard.general.string = trace
+            })
+            alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+            present(alert, animated: true)
+        }
     }
 }
