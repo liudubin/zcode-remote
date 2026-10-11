@@ -189,103 +189,18 @@ final class WebViewController: UIViewController {
         webView.load(URLRequest(url: url))
     }
 
-    /// （重）挂注入脚本：设置变化后重挂，下次页面加载即用新值
+    /// （重）挂页面脚本：iOS 版**强制禁用注入增强层**，回归纯 WebView 壳。
+    /// 背景：增强层（悬浮输入/问题导航/回复通知/主题跟随）依赖页面 v4-* DOM 结构与
+    /// Android 实机调校的选择器，iOS 版页面上适配未完成（icon 不创建），且历史上多轮
+    /// 真机白屏均源自注入链路（递归广播/水合冲突/热更新重刷/进程被杀）。
+    /// 此处仅保留文字缩放这一 WebView 原生能力；恢复注入 = 还原本函数的 shim/bundle
+    /// 装配（ZCodeShim.js / ZCodeBundle.js 资源与生成链路都还在仓库里）。
     private func installBootstrap(into ucc: WKUserContentController) {
         ucc.removeAllUserScripts()
-        // 诊断模式：完全不注入（连桥 shim 都不挂），等价纯 WebView 与 Safari 对照
-        if settings.bareWebview { return }
-
-        // documentStart：shim + 生成物（CSS 常量 + bundle 函数），纯定义无副作用
-        var prelude = ""
-        if let shim = resourceString("ZCodeShim") { prelude += shim + "\n" }
-        if settings.injectLevel != .minimal {
-            if let bundle = resourceString("ZCodeBundle") { prelude += bundle + "\n" }
-        }
-        if !prelude.isEmpty {
-            ucc.addUserScript(WKUserScript(source: prelude, injectionTime: .atDocumentStart, forMainFrameOnly: false))
-        }
-
-        // documentEnd：引导脚本（与 Android injectMobileFix 同构，但注入时机不同——
-        // Android 在 onPageFinished（页面完全加载后）注入；ZCode 会话页是 React SPA，
-        // documentEnd 时 hydration 进行中，此时增强层改 DOM 会引发水合冲突（实机白屏无错误）。
-        // iOS 改为：documentEnd 只装桥/写全局变量并安排任务，页面 load 完成 + 1.2s 后才执行
-        // 增强（4s 兜底定时器防 load 事件不触发）。对齐 Android 的"后置注入"语义。
-        let fullCall = """
-        function __zcGo(){
-          if (window.__zcRan) { return; }
-          window.__zcRan = true;
-          window.__zcBoot = { t: Date.now(), rs: document.readyState };
-          window.zcodeBridge && window.zcodeBridge.jsError('go:full');
-          var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
-          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); }
-          catch (e) { window.zcodeBridge && window.zcodeBridge.jsError('bundle:' + String(e && e.message || e).slice(0, 140)); }
-        }
-        if (document.readyState === 'complete') { setTimeout(__zcGo, 1200); }
-        else {
-          window.addEventListener('load', function(){ setTimeout(__zcGo, 1200); });
-          setTimeout(__zcGo, 4000);
-        }
-        """
-        let bootstrap = """
-        (function(){
-          __zcodeInstallBridge(\(jsString(logoPosValue())), \(jsString(Trace.shared.jsonString())));
-          window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
-          window.__zcodeSafeB=\(lastSafeB);
-          window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack)};
-          \(settings.injectLevel == .full ? fullCall : "")
-          \(textZoomJS())
-        })();
-        """
-        ucc.addUserScript(WKUserScript(source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
-    }
-
-    /// 拉取页面侧诊断（注入状态/内部错误收集器/关键节点 + v4 结构取证），与原生 Trace 拼接后展示
-    func collectPageDiagnostics(_ done: @escaping (String) -> Void) {
-        guard let wv = webView else {
-            done(Trace.shared.jsonString())
-            return
-        }
-        let js = """
-        (function(){
-          function q(s){ try { return !!document.querySelector(s); } catch(e){ return false; } }
-          var tids = [];
-          try {
-            document.querySelectorAll('[data-testid]').forEach(function(el){
-              var t = el.getAttribute('data-testid');
-              if (t && tids.indexOf(t) < 0 && tids.length < 24) { tids.push(t); }
-            });
-          } catch(e){}
-          var cls = [];
-          try {
-            document.documentElement.classList.forEach(function(c){
-              if (c.indexOf('zcode') === 0 && cls.length < 12) { cls.push(c); }
-            });
-          } catch(e){}
-          return JSON.stringify({
-            boot: window.__zcBoot || null, ran: !!window.__zcRan,
-            errs: (window.__zcodeErrors || []).slice(-8), api: !!window.__zcodeAPI,
-            icon: !!document.getElementById('zcode-composer-icon'), rs: document.readyState,
-            dock: q('[data-v4-composer-dock="true"]'), dockAny: q('[data-v4-composer-dock]'),
-            composer: q('[data-testid="v4-composer"]'), rows: document.querySelectorAll('[data-testid^="v4-row"]').length,
-            tids: tids, zcls: cls, floatOn: !!document.documentElement.classList.contains('zcode-float-on')
-          });
-        })()
-        """
-        wv.evaluateJavaScript(js) { result, _ in
-            let page = (result as? String) ?? "{}"
-            done(Trace.shared.jsonString() + "\n\n页面侧: " + page)
-        }
-    }
-
-    private func resourceString(_ name: String) -> String? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
-        return try? String(contentsOf: url, encoding: .utf8)
-    }
-
-    /// Android：未拖过返回空串，JS 端按页面头部自动定位
-    private func logoPosValue() -> String {
-        guard settings.logoPosSet else { return "" }
-        return "\(settings.logoX),\(settings.logoY)"
+        ucc.addUserScript(WKUserScript(
+            source: "(function(){ \(textZoomJS()) })();",
+            injectionTime: .atDocumentEnd, forMainFrameOnly: false
+        ))
     }
 
     private func textZoomJS() -> String {
@@ -294,42 +209,15 @@ final class WebViewController: UIViewController {
         return "document.documentElement.style.webkitTextSizeAdjust='\(z)%';"
     }
 
-    /// 上次已应用的设置快照（对齐 Android 的 applied 机制）：
-    /// 设置没变就绝不触碰页面——之前每次关设置页都无条件重挂脚本+热更新，
-    /// 在 WKWebView 上正是下滑关闭设置后白屏的触发点。
-    private var appliedKey: String?
+    /// 文字缩放快照：设置没变不触碰页面（对齐 Android 的 applied 机制，
+    /// 历史上每次关设置页都重刷页面正是白屏触发点之一）
+    private var appliedZoom: Int?
 
-    private func currentKey() -> String {
-        let s = settings
-        var parts: [String] = [
-            s.hideScrollbar, s.turnNavigator, s.notifyReply, s.floatingInput,
-            s.restoreOnBottom, s.sendMinimize, s.amoledBlack,
-            s.bareWebview, s.injectLevel == .full,
-        ].map { String($0) }
-        parts.append(String(s.textZoom))
-        return parts.joined(separator: ",")
-    }
-
-    /// 设置即时生效：设置页返回时对比快照，有变化才重挂脚本+热更新当前页
+    /// 设置即时生效：现在只剩文字缩放这一项页面侧设置
     func applySettingsIfChanged() {
         guard webView != nil else { return }
-        let key = currentKey()
-        guard key != appliedKey else { return }
-        let firstApply = appliedKey == nil
-        appliedKey = key
-        installBootstrap(into: webView.configuration.userContentController)
-        // 首次应用发生在会话加载前（bootstrap 已带上当前值），无需热更新
-        guard !firstApply else { return }
-        let s = settings
-        let js = "window.__zcodeAPI && window.__zcodeAPI.applySettings({" +
-            "\"scrollbar\":\(s.hideScrollbar)," +
-            "\"turnNav\":\(s.turnNavigator)," +
-            "\"notifyReply\":\(s.notifyReply)," +
-            "\"floatInput\":\(s.floatingInput)," +
-            "\"restoreOnBottom\":\(s.restoreOnBottom)," +
-            "\"sendMinimize\":\(s.sendMinimize)," +
-            "\"amoledBlack\":\(s.amoledBlack)})"
-        webView.evaluateJavaScript(js, completionHandler: nil)
+        guard appliedZoom != settings.textZoom else { return }
+        appliedZoom = settings.textZoom
         webView.evaluateJavaScript(textZoomJS(), completionHandler: nil)
     }
 
@@ -398,10 +286,9 @@ final class WebViewController: UIViewController {
     }
 
     @objc private func openSettingsUI() {
-        let vc = SettingsViewController(
-            onChange: { [weak self] in self?.applySettingsIfChanged() },
-            diagnostics: { [weak self] done in self?.collectPageDiagnostics(done) }
-        )
+        let vc = SettingsViewController { [weak self] in
+            self?.applySettingsIfChanged()
+        }
         present(UINavigationController(rootViewController: vc), animated: true)
     }
 
