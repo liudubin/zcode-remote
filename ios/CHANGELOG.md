@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.0.2-ios95
+
+- revert(ios): 恢复注入档位/禁用字段与诊断重置迁移(ios75 版)
+- revert(ios): 设置页恢复注入相关开关(ios75 版)
+- revert(ios): 回退强制禁用——恢复注入增强层(延迟注入+noBroadcast+快照),回到 ios75 验证可用形态
+
 ## 0.0.2-ios90
 
 - feat(ios): 回挂桥 shim(仅错误上报不碰页面)——纯 WebView 白屏时页面侧 JS 错误可见;doc:readyState 心跳
