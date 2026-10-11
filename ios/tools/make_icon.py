@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""生成 App 图标（1024x1024,单尺寸 asset,本地一次性运行后入库）。
+"""生成 App 图标（1024x1024,单尺寸 asset）与入口页徽标符号（IconSymbol imageset）。
 设计 v2：深黑径向渐变底 + 绿→青渐变发光的 ">_" 终端符号（AI 编程智能体主题）。
 """
-import os
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "ios", "App", "Resources", "Assets.xcassets", "AppIcon.appiconset", "AppIcon1024.png")
+ROOT = Path(__file__).resolve().parents[2]
+ASSETS = ROOT / "ios" / "App" / "Resources" / "Assets.xcassets"
+OUT = ASSETS / "AppIcon.appiconset" / "AppIcon1024.png"
 
 S = 1024
 GREEN = (0, 235, 130)
@@ -55,14 +56,54 @@ for radius, alpha in [(80, 0.16), (38, 0.22), (16, 0.30)]:
     halo.paste(tint, (0, 0), mask.filter(ImageFilter.GaussianBlur(radius)))
     img = Image.alpha_composite(img.convert("RGBA"), halo).convert("RGB")
 
-# 5) 合成符号本体（微内发光提亮边缘）
-inner = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-inner.paste(Image.new("RGBA", (S, S), (255, 255, 255, 38)), (0, 0),
-            Image.eval(mask.filter(ImageFilter.GaussianBlur(6)), lambda v: int(v * 0.15))
-            if False else mask)
+# 5) 合成符号本体
 img.paste(symbol, (0, 0), mask)
-img = Image.alpha_composite(img.convert("RGBA"), inner).convert("RGB")
 
-os.makedirs(os.path.dirname(OUT), exist_ok=True)
+OUT.parent.mkdir(parents=True, exist_ok=True)
 img.save(OUT, "PNG")
-print("icon written:", os.path.relpath(OUT, ROOT))
+print("icon written:", OUT.relative_to(ROOT))
+
+
+# ---------- 附产品：透明底 >_ 符号（入口页头部徽标用，与新 App 图标同款） ----------
+def draw_symbol(size: int) -> Image.Image:
+    """256 基准坐标按比例缩放；透明底、绿→青渐变、圆头线条。"""
+    s = size / 256.0
+    m = Image.new("L", (size, size), 0)
+    md = ImageDraw.Draw(m)
+    w = int(22 * s)
+    def seg(x1, y1, x2, y2):
+        md.line([(x1 * s, y1 * s), (x2 * s, y2 * s)], fill=255, width=w, joint="curve")
+    def cap(x, y):
+        rr = w // 2
+        md.ellipse((x * s - rr, y * s - rr, x * s + rr, y * s + rr), fill=255)
+    seg(55, 62, 117, 128)
+    seg(117, 128, 55, 194)
+    cap(55, 62)
+    cap(117, 128)
+    cap(55, 194)
+    seg(141, 194, 201, 194)
+    cap(141, 194)
+    cap(201, 194)
+    g = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    gpx = g.load()
+    for y in range(size):
+        for x in range(size):
+            t = max(0.0, min(1.0, (x + y) / (size * 2.0)))
+            c = tuple(int(GREEN[i] + (CYAN[i] - GREEN[i]) * t) for i in range(3))
+            gpx[x, y] = (c[0], c[1], c[2], 255)
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.paste(g, (0, 0), m)
+    return out
+
+
+SYMDIR = ASSETS / "IconSymbol.imageset"
+SYMDIR.mkdir(parents=True, exist_ok=True)
+draw_symbol(256).save(SYMDIR / "IconSymbol@2x.png", "PNG")
+draw_symbol(384).save(SYMDIR / "IconSymbol@3x.png", "PNG")
+(SYMDIR / "Contents.json").write_text(
+    '{\n  "images": [\n    {"filename": "IconSymbol@2x.png", "idiom": "universal", "scale": "2x"},\n'
+    '    {"filename": "IconSymbol@3x.png", "idiom": "universal", "scale": "3x"}\n  ],\n'
+    '  "info": {"author": "xcode", "version": 1}\n}\n',
+    encoding="utf-8",
+)
+print("symbol written:", SYMDIR.relative_to(ROOT))
