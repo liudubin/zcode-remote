@@ -3,9 +3,9 @@ import UIKit
 import UserNotifications
 
 /// 入口页（重设计版）：滚动容器 + 键盘避让；头部品牌区、链接卡、扫码主按钮、
-/// 最近会话卡片列表（名字/域名/时间，右上×删除）、底部设置入口。
+/// 最近会话列表（UITableView 卡片样式，**左滑删除**，点按进入）、底部设置入口。
 /// 远控链接即凭证，只保存在本机 UserDefaults，绝不上传。
-final class EntryViewController: UIViewController, UITextFieldDelegate {
+final class EntryViewController: UIViewController, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate {
     /// 进程内只自动跳转一次，避免从远控页返回入口后又被弹回去；
     /// internal：AppDelegate 的 -zcodeURL 直进会置 true 压掉自动恢复
     static var autoJumpedOnce = false
@@ -15,7 +15,8 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let recentsStack = UIStackView()
+    private let recentsTable = UITableView(frame: .zero, style: .plain)
+    private var recentsTableHeight: NSLayoutConstraint!
     private let recentsTitleRow = UIStackView()
     private let recentsHeader = UILabel()
     private let recentsEmpty = UILabel()
@@ -233,8 +234,18 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         recentsTitleRow.addArrangedSubview(spacer)
         recentsTitleRow.addArrangedSubview(clearAll)
 
-        recentsStack.axis = .vertical
-        recentsStack.spacing = 8
+        // 最近会话：UITableView 承载（原生左滑删除），禁滚动、高度随条目数走，
+        // 嵌在外层 ScrollView 里只作列表渲染
+        recentsTable.dataSource = self
+        recentsTable.delegate = self
+        recentsTable.register(UITableViewCell.self, forCellReuseIdentifier: "recent")
+        recentsTable.separatorStyle = .none
+        recentsTable.isScrollEnabled = false
+        recentsTable.backgroundColor = .clear
+        recentsTable.rowHeight = 64
+        recentsTable.translatesAutoresizingMaskIntoConstraints = false
+        recentsTableHeight = recentsTable.heightAnchor.constraint(equalToConstant: 0)
+        recentsTableHeight.isActive = true
 
         recentsEmpty.text = "还没有会话。扫桌面端二维码开始第一次连接。"
         recentsEmpty.font = .systemFont(ofSize: 12)
@@ -245,7 +256,7 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         section.axis = .vertical
         section.spacing = 10
         section.addArrangedSubview(recentsTitleRow)
-        section.addArrangedSubview(recentsStack)
+        section.addArrangedSubview(recentsTable)
         section.addArrangedSubview(recentsEmpty)
         return section
     }
@@ -259,73 +270,95 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         return foot
     }
 
-    /// 一张最近会话卡片：名字 + 域名/时间 + 删除×。
-    /// 点击走 UITapGestureRecognizer（UIControl 方案被内容 UIStackView 拦截 hit-test，
-    /// 实机点不动）；删除按钮独立挂在卡片上，优先于手势响应。
-    private func buildRecentCard(_ r: Recent) -> UIView {
-        let card = UIView()
-        card.backgroundColor = Theme.card
-        card.layer.cornerRadius = 12
-        card.translatesAutoresizingMaskIntoConstraints = false
-        let idx = recentsStack.arrangedSubviews.count
+    // MARK: - 最近会话表格（卡片样式 + 左滑删除）
 
-        let title = UILabel()
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        recents.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "recent", for: indexPath)
+        let r = recents[indexPath.row]
+        cell.backgroundColor = .clear
+        cell.selectionStyle = .default
+        cell.selectedBackgroundView = UIView()
+        cell.selectedBackgroundView?.backgroundColor = Theme.input
+
+        // 卡片容器（圆角），上下留 4pt 形成卡片间距
+        let card = cell.viewWithTag(1001) ?? {
+            let c = UIView()
+            c.tag = 1001
+            c.backgroundColor = Theme.card
+            c.layer.cornerRadius = 12
+            c.translatesAutoresizingMaskIntoConstraints = false
+            cell.contentView.addSubview(c)
+            NSLayoutConstraint.activate([
+                c.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 4),
+                c.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -4),
+                c.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor),
+                c.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor),
+            ])
+            let title = UILabel()
+            title.tag = 1002
+            title.font = .systemFont(ofSize: 15, weight: .medium)
+            title.textColor = Theme.text
+            let sub = UILabel()
+            sub.tag = 1003
+            sub.font = .systemFont(ofSize: 11)
+            sub.textColor = Theme.textSecondary
+            let texts = UIStackView(arrangedSubviews: [title, sub])
+            texts.tag = 1004
+            texts.axis = .vertical
+            texts.spacing = 3
+            let chevron = UILabel()
+            chevron.tag = 1005
+            chevron.text = "›"
+            chevron.textColor = Theme.textSecondary
+            chevron.font = .systemFont(ofSize: 18)
+            let row = UIStackView(arrangedSubviews: [texts, chevron])
+            row.tag = 1006
+            row.axis = .horizontal
+            row.spacing = 10
+            row.alignment = .center
+            row.layoutMargins = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
+            row.isLayoutMarginsRelativeArrangement = true
+            row.translatesAutoresizingMaskIntoConstraints = false
+            c.addSubview(row)
+            NSLayoutConstraint.activate([
+                row.topAnchor.constraint(equalTo: c.topAnchor),
+                row.bottomAnchor.constraint(equalTo: c.bottomAnchor),
+                row.leadingAnchor.constraint(equalTo: c.leadingAnchor),
+                row.trailingAnchor.constraint(equalTo: c.trailingAnchor),
+            ])
+            return c
+        }()
+
+        let texts = card.viewWithTag(1004) as! UIStackView
+        let title = texts.arrangedSubviews[0] as! UILabel
+        let sub = texts.arrangedSubviews[1] as! UILabel
         title.text = r.displayLabel()
-        title.font = .systemFont(ofSize: 15, weight: .medium)
-        title.textColor = Theme.text
-
-        let sub = UILabel()
         let time = Self.timeFormatter.string(from: Date(timeIntervalSince1970: r.last / 1000))
         sub.text = "\(URL(string: r.url)?.host ?? r.url) · \(time)"
-        sub.font = .systemFont(ofSize: 11)
-        sub.textColor = Theme.textSecondary
+        return cell
+    }
 
-        let texts = UIStackView()
-        texts.axis = .vertical
-        texts.spacing = 3
-        texts.addArrangedSubview(title)
-        texts.addArrangedSubview(sub)
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        openUrl(recents[indexPath.row].url)
+    }
 
-        let chevron = UILabel()
-        chevron.text = "›"
-        chevron.textColor = Theme.textSecondary
-        chevron.font = .systemFont(ofSize: 18)
-
-        let del = UIButton(type: .system)
-        del.setTitle("×", for: .normal)
-        del.setTitleColor(Theme.textSecondary, for: .normal)
-        del.titleLabel?.font = .systemFont(ofSize: 20)
-        del.tag = idx
-        del.addTarget(self, action: #selector(onRecentDelete(_:)), for: .touchUpInside)
-        del.translatesAutoresizingMaskIntoConstraints = false
-
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = 10
-        row.alignment = .center
-        row.layoutMargins = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
-        row.isLayoutMarginsRelativeArrangement = true
-        row.translatesAutoresizingMaskIntoConstraints = false
-        texts.setContentHuggingPriority(.init(249), for: .horizontal)
-        row.addArrangedSubview(texts)
-        row.addArrangedSubview(chevron)
-        card.addSubview(row)
-        card.addSubview(del)
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(onRecentTap(_:)))
-        card.addGestureRecognizer(tap)
-
-        card.tag = idx
-        NSLayoutConstraint.activate([
-            row.topAnchor.constraint(equalTo: card.topAnchor),
-            row.bottomAnchor.constraint(equalTo: card.bottomAnchor),
-            row.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            row.trailingAnchor.constraint(equalTo: del.leadingAnchor, constant: -6),
-            del.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
-            del.centerYAnchor.constraint(equalTo: card.centerYAnchor),
-            del.widthAnchor.constraint(equalToConstant: 34),
-        ])
-        return card
+    /// 左滑删除（原生 swipe action，直接删除不二次确认）
+    func tableView(_ tableView: UITableView,
+                   trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let del = UIContextualAction(style: .destructive, title: "删除") { [weak self] _, _, done in
+            guard let self else { done(false); return }
+            self.store.remove(self.recents[indexPath.row].url)
+            self.refreshRecents()
+            self.toast("已删除")
+            done(true)
+        }
+        del.backgroundColor = Theme.destructive
+        return UISwipeActionsConfiguration(actions: [del])
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -418,26 +451,6 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
         return true
     }
 
-    @objc private func onRecentTap(_ sender: UITapGestureRecognizer) {
-        guard let tag = sender.view?.tag, recents.indices.contains(tag) else { return }
-        openUrl(recents[tag].url)
-    }
-
-    @objc private func onRecentDelete(_ sender: UIButton) {
-        let idx = sender.tag
-        guard recents.indices.contains(idx) else { return }
-        let item = recents[idx]
-        let alert = UIAlertController(
-            title: "删除最近会话？", message: item.displayLabel(), preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
-            self?.store.remove(item.url)
-            self?.refreshRecents()
-        })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        present(alert, animated: true)
-    }
-
     /// 冷启动时如果最近有会话，直接进入，省去每次再点一下
     private func autoResumeLastSession() {
         guard !Self.autoJumpedOnce else { return }
@@ -477,12 +490,11 @@ final class EntryViewController: UIViewController, UITextFieldDelegate {
 
     private func refreshRecents() {
         recents = store.load()
-        recentsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for r in recents {
-            recentsStack.addArrangedSubview(buildRecentCard(r))
-        }
+        recentsTable.reloadData()
+        // 嵌在外层 ScrollView 里：表格高度随条目数走（每行 64）
+        recentsTableHeight.constant = CGFloat(recents.count) * 64
         let empty = recents.isEmpty
-        recentsStack.isHidden = empty
+        recentsTable.isHidden = empty
         recentsEmpty.isHidden = !empty
         recentsTitleRow.isHidden = false
     }
