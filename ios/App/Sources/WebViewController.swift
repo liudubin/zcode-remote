@@ -39,6 +39,9 @@ final class WebViewController: UIViewController {
     /// 网络瞬断自动重试计数（didCommit 成功即清零）
     private var retryCount = 0
 
+    /// 上次 WebContent 进程被杀时刻（重载节流用，防杀→载循环）
+    private var lastWebkillAt = Date.distantPast
+
     private var observers: [NSObjectProtocol] = []
 
     init(url: String) {
@@ -423,8 +426,6 @@ extension WebViewController: WKNavigationDelegate {
         guard !throttled else { return }
         webView.reload()
     }
-
-    private var lastWebkillAt = Date.distantPast
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
         Trace.shared.record("loaded", webView.url?.host ?? "", "ok")
