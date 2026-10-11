@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios97
+
+- feat(ios): 最近会话改左滑删除——自绘卡片列表换 UITableView(原生 trailing swipe action,点按进入),顺带根除自绘卡片点击/手势兼容问题
+
 ## 0.0.2-ios95
 
 - revert(ios): 恢复注入档位/禁用字段与诊断重置迁移(ios75 版)

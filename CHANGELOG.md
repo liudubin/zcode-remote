@@ -41,6 +41,9 @@
 - revert(ios): 恢复注入档位/禁用字段与诊断重置迁移(ios75 版)
 - revert(ios): 设置页恢复注入相关开关(ios75 版)
 - revert(ios): 回退强制禁用——恢复注入增强层(延迟注入+noBroadcast+快照),回到 ios75 验证可用形态
+## [v0.0.2-ios97 · iOS] — 2026-10-11
+
+- feat(ios): 最近会话改左滑删除——自绘卡片列表换 UITableView(原生 trailing swipe action,点按进入),顺带根除自绘卡片点击/手势兼容问题
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。
