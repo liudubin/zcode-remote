@@ -2,16 +2,13 @@ import UIKit
 
 /// 设置页：会话页外观 + 后台保活 + 通知（对应 Android SettingsActivity）。
 /// 每次变更即时回调 onChange → WebViewController 热更新页面，返回会话不用重进。
-/// diagnostics：会话内提供（异步拉取页面侧+原生 Trace）；入口页进入时无会话，置 nil。
+/// 注：iOS 版已强制禁用注入增强层，本页只保留对纯 WebView 仍有意义的开关。
 final class SettingsViewController: UITableViewController {
     private let settings = SettingsStore.shared
     private let onChange: () -> Void
-    private let diagnostics: ((@escaping (String) -> Void) -> Void)?
 
-    init(onChange: @escaping () -> Void,
-         diagnostics: ((@escaping (String) -> Void) -> Void)? = nil) {
+    init(onChange: @escaping () -> Void) {
         self.onChange = onChange
-        self.diagnostics = diagnostics
         super.init(style: .insetGrouped)
     }
 
@@ -49,40 +46,21 @@ final class SettingsViewController: UITableViewController {
 
     private var rows: [(Section, Row)] {
         [
-            (Section.page, Row(title: "隐藏滚动条", subtitle: "关 = 3px 细滚动条",
-                               boolKey: ({ $0.hideScrollbar }, { $0.hideScrollbar = $1 }), segmented: nil)),
-            (Section.page, Row(title: "对话问题导航", subtitle: "左缘三滑唤出",
-                               boolKey: ({ $0.turnNavigator }, { $0.turnNavigator = $1 }), segmented: nil)),
-            (Section.page, Row(title: "浮动输入框", subtitle: "增强 UI 总开关",
-                               boolKey: ({ $0.floatingInput }, { $0.floatingInput = $1 }), segmented: nil)),
-            (Section.page, Row(title: "滑到底部恢复输入框", subtitle: nil,
-                               boolKey: ({ $0.restoreOnBottom }, { $0.restoreOnBottom = $1 }), segmented: nil)),
-            (Section.page, Row(title: "发送后自动收纳", subtitle: nil,
-                               boolKey: ({ $0.sendMinimize }, { $0.sendMinimize = $1 }), segmented: nil)),
-            (Section.page, Row(title: "纯黑 AMOLED", subtitle: "实验",
-                               boolKey: ({ $0.amoledBlack }, { $0.amoledBlack = $1 }), segmented: nil)),
+            // 注：注入增强层已强制禁用，依赖注入的开关（滚动条/浮动输入/导航/通知等）
+            // 一并移除，避免"开关无效"的困惑；恢复注入时随装配一起恢复这些行。
             (Section.page, Row(title: "文字缩放", subtitle: nil, boolKey: nil,
                                segmented: (items: ["75%", "100%", "125%", "150%"],
                                            get: { self.settings.textZoom },
                                            set: { self.settings.textZoom = $0 }))),
 
-            (Section.background, Row(title: "新回复通知", subtitle: "切出后弹系统通知",
-                                     boolKey: ({ $0.notifyReply }, { $0.notifyReply = $1 }), segmented: nil)),
-            (Section.background, Row(title: "后台保活", subtitle: "静音音频维持连接",
+            (Section.background, Row(title: "后台保活", subtitle: "切后台静音音频维持网络",
                                      boolKey: ({ $0.keepAliveEnabled }, { $0.keepAliveEnabled = $1 }), segmented: nil)),
             (Section.background, Row(title: "保活时长", subtitle: nil, boolKey: nil,
                                      segmented: (items: ["10 分钟", "30 分钟", "不限"],
                                                  get: { self.settings.keepAliveMinutes <= 0 ? 2 : (self.settings.keepAliveMinutes <= 10 ? 0 : 1) },
                                                  set: { self.settings.keepAliveMinutes = $0 == 2 ? 0 : ($0 == 0 ? 10 : 30) }))),
 
-            (Section.about, Row(title: "注入档位（诊断）", subtitle: "最小=只装桥不注增强，改后重进会话", boolKey: nil,
-                                segmented: (items: ["完整", "最小"],
-                                            get: { self.settings.injectLevel == .full ? 0 : 1 },
-                                            set: { self.settings.injectLevel = $0 == 0 ? .full : .minimal }))),
-            (Section.about, Row(title: "禁用注入增强层", subtitle: "诊断：连不上时对照，改后重进",
-                                boolKey: ({ $0.bareWebview }, { $0.bareWebview = $1 }), segmented: nil)),
             (Section.about, Row(title: "更新日志", subtitle: nil, boolKey: nil, segmented: nil)),
-            (Section.about, Row(title: "注入诊断", subtitle: "最近的注入/页面错误与回复链路事件", boolKey: nil, segmented: nil)),
             (Section.about, Row(title: Self.versionLine(), subtitle: "非智谱官方产品 · 链接即凭证，仅存本机", boolKey: nil, segmented: nil)),
         ]
     }
@@ -157,7 +135,7 @@ final class SettingsViewController: UITableViewController {
             }, for: .valueChanged)
             cell.accessoryView = seg
             cell.selectionStyle = .none
-        } else if row.title == "更新日志" || row.title == "注入诊断" {
+        } else if row.title == "更新日志" {
             cell.selectionStyle = .default
             cell.accessoryType = .disclosureIndicator
         } else {
@@ -168,30 +146,8 @@ final class SettingsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let row = rows(in: sectionOrder[indexPath.section])[indexPath.row].1
-        guard row.title == "更新日志" || row.title == "注入诊断" else { return }
+        guard row.title == "更新日志" else { return }
         tableView.deselectRow(at: indexPath, animated: true)
-        if row.title == "更新日志" {
-            navigationController?.pushViewController(ChangelogViewController(), animated: true)
-            return
-        }
-        // 注入诊断：原生 Trace + 页面侧状态（boot 时序/内部错误收集器/关键节点），异步拉取
-        if let fetch = diagnostics {
-            fetch { [weak self] text in
-                let alert = UIAlertController(title: "注入诊断", message: text, preferredStyle: .actionSheet)
-                alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
-                    UIPasteboard.general.string = text
-                })
-                alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
-                self?.present(alert, animated: true)
-            }
-        } else {
-            let trace = Trace.shared.jsonString()
-            let alert = UIAlertController(title: "注入诊断（最近事件）", message: trace, preferredStyle: .actionSheet)
-            alert.addAction(UIAlertAction(title: "复制", style: .default) { _ in
-                UIPasteboard.general.string = trace
-            })
-            alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
-            present(alert, animated: true)
-        }
+        navigationController?.pushViewController(ChangelogViewController(), animated: true)
     }
 }
