@@ -39,9 +39,6 @@ final class WebViewController: UIViewController {
     /// 网络瞬断自动重试计数（didCommit 成功即清零）
     private var retryCount = 0
 
-    /// 上次 WebContent 进程被杀时刻（重载节流用，防杀→载循环）
-    private var lastWebkillAt = Date.distantPast
-
     private var observers: [NSObjectProtocol] = []
 
     init(url: String) {
@@ -192,31 +189,103 @@ final class WebViewController: UIViewController {
         webView.load(URLRequest(url: url))
     }
 
-    /// （重）挂页面脚本：增强层维持**强制禁用**，但回挂桥 shim——它不修改页面任何
-    /// 行为，只在 documentStart 装 window.onerror/unhandledrejection 监听并上报原生
-    /// （页面 JS 崩溃取证用；纯 WebView 也会白屏，之前删掉 shim 后这类错误不可见）。
+    /// （重）挂注入脚本：设置变化后重挂，下次页面加载即用新值
     private func installBootstrap(into ucc: WKUserContentController) {
         ucc.removeAllUserScripts()
-        if var shim = resourceString("ZCodeShim") {
-            shim += "\n__zcodeInstallBridge('', '[]');"
-            ucc.addUserScript(WKUserScript(
-                source: shim, injectionTime: .atDocumentStart, forMainFrameOnly: false
-            ))
+        // 诊断模式：完全不注入（连桥 shim 都不挂），等价纯 WebView 与 Safari 对照
+        if settings.bareWebview { return }
+
+        // documentStart：shim + 生成物（CSS 常量 + bundle 函数），纯定义无副作用
+        var prelude = ""
+        if let shim = resourceString("ZCodeShim") { prelude += shim + "\n" }
+        if settings.injectLevel != .minimal {
+            if let bundle = resourceString("ZCodeBundle") { prelude += bundle + "\n" }
         }
+        if !prelude.isEmpty {
+            ucc.addUserScript(WKUserScript(source: prelude, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
+
+        // documentEnd：引导脚本（与 Android injectMobileFix 同构，但注入时机不同——
+        // Android 在 onPageFinished（页面完全加载后）注入；ZCode 会话页是 React SPA，
+        // documentEnd 时 hydration 进行中，此时增强层改 DOM 会引发水合冲突（实机白屏无错误）。
+        // iOS 改为：documentEnd 只装桥/写全局变量并安排任务，页面 load 完成 + 1.2s 后才执行
+        // 增强（4s 兜底定时器防 load 事件不触发）。对齐 Android 的"后置注入"语义。
+        let fullCall = """
+        function __zcGo(){
+          if (window.__zcRan) { return; }
+          window.__zcRan = true;
+          window.__zcBoot = { t: Date.now(), rs: document.readyState };
+          window.zcodeBridge && window.zcodeBridge.jsError('go:full');
+          var css = window.__ZCODE_CSS_BASE + (\(settings.hideScrollbar) ? window.__ZCODE_SCROLLBAR_HIDDEN : window.__ZCODE_SCROLLBAR_SLIM);
+          try { (window.__ZCODE_BUNDLE)(css, \(settings.turnNavigator), \(settings.notifyReply), \(settings.floatingInput), true, {noBroadcast:true}); }
+          catch (e) { window.zcodeBridge && window.zcodeBridge.jsError('bundle:' + String(e && e.message || e).slice(0, 140)); }
+        }
+        if (document.readyState === 'complete') { setTimeout(__zcGo, 1200); }
+        else {
+          window.addEventListener('load', function(){ setTimeout(__zcGo, 1200); });
+          setTimeout(__zcGo, 4000);
+        }
+        """
         let bootstrap = """
         (function(){
-          window.zcodeBridge && window.zcodeBridge.jsError('doc:' + document.readyState);
+          __zcodeInstallBridge(\(jsString(logoPosValue())), \(jsString(Trace.shared.jsonString())));
+          window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
+          window.__zcodeSafeB=\(lastSafeB);
+          window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack)};
+          \(settings.injectLevel == .full ? fullCall : "")
           \(textZoomJS())
         })();
         """
-        ucc.addUserScript(WKUserScript(
-            source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false
-        ))
+        ucc.addUserScript(WKUserScript(source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
+    }
+
+    /// 拉取页面侧诊断（注入状态/内部错误收集器/关键节点 + v4 结构取证），与原生 Trace 拼接后展示
+    func collectPageDiagnostics(_ done: @escaping (String) -> Void) {
+        guard let wv = webView else {
+            done(Trace.shared.jsonString())
+            return
+        }
+        let js = """
+        (function(){
+          function q(s){ try { return !!document.querySelector(s); } catch(e){ return false; } }
+          var tids = [];
+          try {
+            document.querySelectorAll('[data-testid]').forEach(function(el){
+              var t = el.getAttribute('data-testid');
+              if (t && tids.indexOf(t) < 0 && tids.length < 24) { tids.push(t); }
+            });
+          } catch(e){}
+          var cls = [];
+          try {
+            document.documentElement.classList.forEach(function(c){
+              if (c.indexOf('zcode') === 0 && cls.length < 12) { cls.push(c); }
+            });
+          } catch(e){}
+          return JSON.stringify({
+            boot: window.__zcBoot || null, ran: !!window.__zcRan,
+            errs: (window.__zcodeErrors || []).slice(-8), api: !!window.__zcodeAPI,
+            icon: !!document.getElementById('zcode-composer-icon'), rs: document.readyState,
+            dock: q('[data-v4-composer-dock="true"]'), dockAny: q('[data-v4-composer-dock]'),
+            composer: q('[data-testid="v4-composer"]'), rows: document.querySelectorAll('[data-testid^="v4-row"]').length,
+            tids: tids, zcls: cls, floatOn: !!document.documentElement.classList.contains('zcode-float-on')
+          });
+        })()
+        """
+        wv.evaluateJavaScript(js) { result, _ in
+            let page = (result as? String) ?? "{}"
+            done(Trace.shared.jsonString() + "\n\n页面侧: " + page)
+        }
     }
 
     private func resourceString(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
         return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    /// Android：未拖过返回空串，JS 端按页面头部自动定位
+    private func logoPosValue() -> String {
+        guard settings.logoPosSet else { return "" }
+        return "\(settings.logoX),\(settings.logoY)"
     }
 
     private func textZoomJS() -> String {
@@ -225,15 +294,42 @@ final class WebViewController: UIViewController {
         return "document.documentElement.style.webkitTextSizeAdjust='\(z)%';"
     }
 
-    /// 文字缩放快照：设置没变不触碰页面（对齐 Android 的 applied 机制，
-    /// 历史上每次关设置页都重刷页面正是白屏触发点之一）
-    private var appliedZoom: Int?
+    /// 上次已应用的设置快照（对齐 Android 的 applied 机制）：
+    /// 设置没变就绝不触碰页面——之前每次关设置页都无条件重挂脚本+热更新，
+    /// 在 WKWebView 上正是下滑关闭设置后白屏的触发点。
+    private var appliedKey: String?
 
-    /// 设置即时生效：现在只剩文字缩放这一项页面侧设置
+    private func currentKey() -> String {
+        let s = settings
+        var parts: [String] = [
+            s.hideScrollbar, s.turnNavigator, s.notifyReply, s.floatingInput,
+            s.restoreOnBottom, s.sendMinimize, s.amoledBlack,
+            s.bareWebview, s.injectLevel == .full,
+        ].map { String($0) }
+        parts.append(String(s.textZoom))
+        return parts.joined(separator: ",")
+    }
+
+    /// 设置即时生效：设置页返回时对比快照，有变化才重挂脚本+热更新当前页
     func applySettingsIfChanged() {
         guard webView != nil else { return }
-        guard appliedZoom != settings.textZoom else { return }
-        appliedZoom = settings.textZoom
+        let key = currentKey()
+        guard key != appliedKey else { return }
+        let firstApply = appliedKey == nil
+        appliedKey = key
+        installBootstrap(into: webView.configuration.userContentController)
+        // 首次应用发生在会话加载前（bootstrap 已带上当前值），无需热更新
+        guard !firstApply else { return }
+        let s = settings
+        let js = "window.__zcodeAPI && window.__zcodeAPI.applySettings({" +
+            "\"scrollbar\":\(s.hideScrollbar)," +
+            "\"turnNav\":\(s.turnNavigator)," +
+            "\"notifyReply\":\(s.notifyReply)," +
+            "\"floatInput\":\(s.floatingInput)," +
+            "\"restoreOnBottom\":\(s.restoreOnBottom)," +
+            "\"sendMinimize\":\(s.sendMinimize)," +
+            "\"amoledBlack\":\(s.amoledBlack)})"
+        webView.evaluateJavaScript(js, completionHandler: nil)
         webView.evaluateJavaScript(textZoomJS(), completionHandler: nil)
     }
 
@@ -302,9 +398,10 @@ final class WebViewController: UIViewController {
     }
 
     @objc private func openSettingsUI() {
-        let vc = SettingsViewController { [weak self] in
-            self?.applySettingsIfChanged()
-        }
+        let vc = SettingsViewController(
+            onChange: { [weak self] in self?.applySettingsIfChanged() },
+            diagnostics: { [weak self] done in self?.collectPageDiagnostics(done) }
+        )
         present(UINavigationController(rootViewController: vc), animated: true)
     }
 
@@ -428,20 +525,16 @@ extension WebViewController: WKNavigationDelegate {
         log.info("didCommit \(webView.url?.absoluteString ?? "-", privacy: .public)")
     }
 
-    /// WebContent 进程被系统杀掉（切后台/内存压力）后恢复的页面状态不可信，整页重载。
-    /// 节流：10 秒内反复被杀只重载一次，防"杀→载→再杀"循环白屏闪动。
+    /// WebContent 进程被系统杀掉（切后台/内存压力）后，WKWebView 恢复的页面不会重新执行
+    /// user scripts——增强层会凭空消失（表现为回来后悬浮按钮没了、诊断 ran:false）。
+    /// 处理：进程死亡回调直接整页重载，注入链路随之完整重建。
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         log.error("webContent terminated, reloading")
-        let now = Date()
-        let throttled = now.timeIntervalSince(lastWebkillAt) < 10
-        lastWebkillAt = now
-        Trace.shared.record("webkill", "", throttled ? "skip(throttled)" : "reload")
-        guard !throttled else { return }
+        Trace.shared.record("webkill", "", "reload")
         webView.reload()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
-        Trace.shared.record("loaded", webView.url?.host ?? "", "ok")
         log.info("didFinish \(webView.url?.absoluteString ?? "-", privacy: .public)")
     }
 
@@ -449,14 +542,12 @@ extension WebViewController: WKNavigationDelegate {
         let ns = error as NSError
         // NSURLErrorCancelled = 页面自身重定向/被新导航顶掉，正常现象不算失败
         guard ns.code != NSURLErrorCancelled else { return }
-        Trace.shared.record("loadfail", String(ns.code), String(error.localizedDescription.prefix(60)))
         log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
 
         // DNS/瞬断类失败自动退避重试（真机实测 zcode.z.ai 在部分网络下间歇解析失败）
         if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {
             retryCount += 1
             let delay = Double(retryCount) * 1.5
-            Trace.shared.record("retry", String(ns.code), "#\(retryCount) in \(Int(delay))s")
             log.info("auto retry #\(self.retryCount, privacy: .public) in \(Int(delay), privacy: .public)s")
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.loadSession()
