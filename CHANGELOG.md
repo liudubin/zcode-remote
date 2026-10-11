@@ -28,6 +28,11 @@
 ## [v0.0.2-ios83 · iOS] — 2026-10-11
 
 - fix(deb): postinst 升级时先 uicache -u 注销再 -p 注册,强制刷新主屏图标缓存
+## [v0.0.2-ios88 · iOS] — 2026-10-11
+
+- fix(ios): lastWebkillAt 挪回类主体(extension 不能有存储属性)
+- feat(ios): 设置页恢复诊断入口(纯原生事件,不依赖注入)
+- feat(ios): 导航事件进诊断(loaded/loadfail/retry/webkill)+进程被杀重载 10s 节流防循环白屏
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。
