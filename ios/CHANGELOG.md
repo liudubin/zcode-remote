@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.0.2-ios103
+
+- fix(ios): 入口页左上角徽标从 ⚡ emoji 换成与新 App 图标同款的 >_ 渐变符号
+- icon: IconSymbol imageset 清单
+- icon: 入口页徽标符号 @3x
+- icon: 入口页徽标符号 @2x
+- build(icon): 附产透明底 >_ 符号 imageset(入口页徽标用);路径改 pathlib 消除 ../ 形态
+
 ## 0.0.2-ios97
 
 - feat(ios): 最近会话改左滑删除——自绘卡片列表换 UITableView(原生 trailing swipe action,点按进入),顺带根除自绘卡片点击/手势兼容问题
