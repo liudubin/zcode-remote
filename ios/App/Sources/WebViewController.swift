@@ -412,16 +412,22 @@ extension WebViewController: WKNavigationDelegate {
         log.info("didCommit \(webView.url?.absoluteString ?? "-", privacy: .public)")
     }
 
-    /// WebContent 进程被系统杀掉（切后台/内存压力）后，WKWebView 恢复的页面不会重新执行
-    /// user scripts——增强层会凭空消失（表现为回来后悬浮按钮没了、诊断 ran:false）。
-    /// 处理：进程死亡回调直接整页重载，注入链路随之完整重建。
+    /// WebContent 进程被系统杀掉（切后台/内存压力）后恢复的页面状态不可信，整页重载。
+    /// 节流：10 秒内反复被杀只重载一次，防"杀→载→再杀"循环白屏闪动。
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         log.error("webContent terminated, reloading")
-        Trace.shared.record("webkill", "", "reload")
+        let now = Date()
+        let throttled = now.timeIntervalSince(lastWebkillAt) < 10
+        lastWebkillAt = now
+        Trace.shared.record("webkill", "", throttled ? "skip(throttled)" : "reload")
+        guard !throttled else { return }
         webView.reload()
     }
 
+    private var lastWebkillAt = Date.distantPast
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+        Trace.shared.record("loaded", webView.url?.host ?? "", "ok")
         log.info("didFinish \(webView.url?.absoluteString ?? "-", privacy: .public)")
     }
 
@@ -429,12 +435,14 @@ extension WebViewController: WKNavigationDelegate {
         let ns = error as NSError
         // NSURLErrorCancelled = 页面自身重定向/被新导航顶掉，正常现象不算失败
         guard ns.code != NSURLErrorCancelled else { return }
+        Trace.shared.record("loadfail", String(ns.code), String(error.localizedDescription.prefix(60)))
         log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
 
         // DNS/瞬断类失败自动退避重试（真机实测 zcode.z.ai 在部分网络下间歇解析失败）
         if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {
             retryCount += 1
             let delay = Double(retryCount) * 1.5
+            Trace.shared.record("retry", String(ns.code), "#\(retryCount) in \(Int(delay))s")
             log.info("auto retry #\(self.retryCount, privacy: .public) in \(Int(delay), privacy: .public)s")
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.loadSession()
