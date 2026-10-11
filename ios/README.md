@@ -1,6 +1,8 @@
 # ZCodeRemote for iOS
 
-Android 版 [ZCodeRemote](../README.md) 的 iOS 适配。同一个 ZCode 手机远控网页，同一套注入式增强层，包装成 iOS App，面向越狱设备侧载分发（当前验证环境：Relaxin / RootHide 架构，iOS 16.5+）。
+Android 版 [ZCodeRemote](../README.md) 的 iOS 适配。同一个 ZCode 手机远控网页，包装成 iOS App，面向越狱设备侧载分发（当前验证环境：Relaxin / RootHide 架构，iOS 16.5+）。
+
+> **当前形态：纯 WebView 壳（注入增强层强制禁用）。** Android 版的注入增强层（悬浮输入/问题导航/回复通知等）依赖页面 `v4-*` DOM 结构与 Android 实机调校的选择器，iOS 页面上尚未完成适配，且历史多轮真机白屏均源自注入链路（递归广播 / React 水合冲突 / 设置热更新重刷 / WebContent 进程被杀）。`ZCodeShim.js` / `ZCodeBundle.js` 资源与生成链路都还在仓库里，恢复注入只需还原 `WebViewController.installBootstrap` 的装配。当前保留的原生能力：扫码/粘贴/最近会话入口、文字缩放、后台保活（静音音频）、更新日志。
 
 > ⚠️ 本应用**非智谱官方产品**，与 Z.ai / ZCode 官方无关，仅供个人使用与学习。远控链接即凭证，请勿分享本应用及其中保存的链接。
 
