@@ -57,6 +57,8 @@ UC=""
 [ -z "$UC" ] && [ -x /usr/bin/uicache ] && UC=/usr/bin/uicache
 [ -z "$UC" ] && UC="$(command -v uicache 2>/dev/null)"
 if [ -n "$APP" ] && [ -n "$UC" ]; then
+  # 先注销再注册：覆盖升级时强制刷新 SpringBoard 图标缓存（否则一直显示旧图标）
+  "$UC" -u "$APP" >/dev/null 2>&1 || true
   "$UC" -p "$APP" || true
 fi
 exit 0
