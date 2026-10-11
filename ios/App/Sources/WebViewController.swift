@@ -192,18 +192,31 @@ final class WebViewController: UIViewController {
         webView.load(URLRequest(url: url))
     }
 
-    /// （重）挂页面脚本：iOS 版**强制禁用注入增强层**，回归纯 WebView 壳。
-    /// 背景：增强层（悬浮输入/问题导航/回复通知/主题跟随）依赖页面 v4-* DOM 结构与
-    /// Android 实机调校的选择器，iOS 版页面上适配未完成（icon 不创建），且历史上多轮
-    /// 真机白屏均源自注入链路（递归广播/水合冲突/热更新重刷/进程被杀）。
-    /// 此处仅保留文字缩放这一 WebView 原生能力；恢复注入 = 还原本函数的 shim/bundle
-    /// 装配（ZCodeShim.js / ZCodeBundle.js 资源与生成链路都还在仓库里）。
+    /// （重）挂页面脚本：增强层维持**强制禁用**，但回挂桥 shim——它不修改页面任何
+    /// 行为，只在 documentStart 装 window.onerror/unhandledrejection 监听并上报原生
+    /// （页面 JS 崩溃取证用；纯 WebView 也会白屏，之前删掉 shim 后这类错误不可见）。
     private func installBootstrap(into ucc: WKUserContentController) {
         ucc.removeAllUserScripts()
+        if var shim = resourceString("ZCodeShim") {
+            shim += "\n__zcodeInstallBridge('', '[]');"
+            ucc.addUserScript(WKUserScript(
+                source: shim, injectionTime: .atDocumentStart, forMainFrameOnly: false
+            ))
+        }
+        let bootstrap = """
+        (function(){
+          window.zcodeBridge && window.zcodeBridge.jsError('doc:' + document.readyState);
+          \(textZoomJS())
+        })();
+        """
         ucc.addUserScript(WKUserScript(
-            source: "(function(){ \(textZoomJS()) })();",
-            injectionTime: .atDocumentEnd, forMainFrameOnly: false
+            source: bootstrap, injectionTime: .atDocumentEnd, forMainFrameOnly: false
         ))
+    }
+
+    private func resourceString(_ name: String) -> String? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 
     private func textZoomJS() -> String {
