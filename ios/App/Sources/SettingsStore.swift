@@ -1,19 +1,12 @@
 import Foundation
 
-/// 基础设置：会话页外观与后台保活策略（UserDefaults，与 Android SettingsStore 字段一一对应）。
+/// 基础设置（UserDefaults）。注：iOS 版已强制禁用注入增强层，注入相关开关已随
+/// 设置页一并移除；此处仅保留对纯 WebView 仍有意义的项与未来恢复注入时的存量字段。
 final class SettingsStore {
     static let shared = SettingsStore()
     private let d = UserDefaults.standard
 
-    private init() {
-        // 一次性迁移：诊断档位是排障用的临时状态，升级后自动回到完整档
-        // （避免用户困在最小档/纯 WebView 模式，增强功能"莫名消失"）
-        if !d.bool(forKey: "diag_reset_auto") {
-            d.set(true, forKey: "diag_reset_auto")
-            if injectLevel == .minimal { injectLevel = .full }
-            if bareWebview { bareWebview = false }
-        }
-    }
+    private init() {}
 
     private func bool(_ key: String, _ def: Bool) -> Bool {
         d.object(forKey: key) == nil ? def : d.bool(forKey: key)
@@ -95,22 +88,6 @@ final class SettingsStore {
         set { d.set(newValue, forKey: K.amoledBlack) }
     }
 
-    /// 诊断：完全禁用注入增强层（纯 WebView 对照，排除增强层干扰）
-    var bareWebview: Bool {
-        get { bool(K.bareWebview, false) }
-        set { d.set(newValue, forKey: K.bareWebview) }
-    }
-
-    /// 注入档位（诊断二分用）：full=完整增强；minimal=只装桥+埋点不注增强
-    var injectLevel: InjectLevel {
-        get { InjectLevel(rawValue: d.string(forKey: K.injectLevel) ?? "") ?? .full }
-        set { d.set(newValue.rawValue, forKey: K.injectLevel) }
-    }
-
-    enum InjectLevel: String {
-        case full, minimal
-    }
-
     /// 浮动 logo 位置（比例坐标；v65 起 logo 已移除，字段保留兼容桥接口）
     var logoPosSet: Bool {
         get { bool(K.logoPosSet, false) }
@@ -138,8 +115,6 @@ final class SettingsStore {
         static let restoreOnBottom = "restore_on_bottom"
         static let sendMinimize = "send_minimize"
         static let amoledBlack = "amoled_black"
-        static let bareWebview = "bare_webview"
-        static let injectLevel = "inject_level"
         static let logoPosSet = "logo_pos_set"
         static let logoX = "logo_x"
         static let logoY = "logo_y"
