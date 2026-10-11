@@ -101,10 +101,9 @@ final class EntryViewController: UIViewController, UITextFieldDelegate, UITableV
         row.spacing = 14
         row.alignment = .center
 
-        let badge = UILabel()
-        badge.text = "⚡"
-        badge.font = .systemFont(ofSize: 34)
-        badge.textAlignment = .center
+        // 品牌徽标：与新 App 图标同款的 >_ 渐变符号（IconSymbol imageset）
+        let badge = UIImageView(image: UIImage(named: "IconSymbol"))
+        badge.contentMode = .scaleAspectFit
         badge.layer.cornerRadius = 16
         badge.clipsToBounds = true
         badge.backgroundColor = Theme.card
