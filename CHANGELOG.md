@@ -33,6 +33,9 @@
 - fix(ios): lastWebkillAt 挪回类主体(extension 不能有存储属性)
 - feat(ios): 设置页恢复诊断入口(纯原生事件,不依赖注入)
 - feat(ios): 导航事件进诊断(loaded/loadfail/retry/webkill)+进程被杀重载 10s 节流防循环白屏
+## [v0.0.2-ios90 · iOS] — 2026-10-11
+
+- feat(ios): 回挂桥 shim(仅错误上报不碰页面)——纯 WebView 白屏时页面侧 JS 错误可见;doc:readyState 心跳
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。

@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios90
+
+- feat(ios): 回挂桥 shim(仅错误上报不碰页面)——纯 WebView 白屏时页面侧 JS 错误可见;doc:readyState 心跳
+
 ## 0.0.2-ios88
 
 - fix(ios): lastWebkillAt 挪回类主体(extension 不能有存储属性)
