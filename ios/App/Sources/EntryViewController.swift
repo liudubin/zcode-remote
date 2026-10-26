@@ -512,7 +512,20 @@ final class EntryViewController: UIViewController, UITextFieldDelegate, UITableV
         }
     }
 
+    /// 远控链接判定。zcode.z.ai 已加语言前缀路由（/remote 会 307 到 /cn/remote 等），
+    /// 桌面端二维码里的链接可能是 /cn/remote、/en/remote 形态——旧的 contains 判定
+    /// 会把新版二维码误报成"非远控链接"，重新扫码配对时多一道吓人的确认框。
     private static func looksLikeRemoteLink(_ url: String) -> Bool {
-        url.hasPrefix("https://") && url.contains("zcode.z.ai/remote")
+        guard url.hasPrefix("https://") else { return false }
+        if url.contains("zcode.z.ai/remote") { return true }
+        guard let u = URL(string: url), u.host?.lowercased() == "zcode.z.ai" else { return false }
+        let path = u.path
+        if path == "/remote" || path.hasPrefix("/remote/") { return true }
+        return localeRemotePath.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)) != nil
     }
+
+    /// /cn/remote、/en/remote、/zh-cn/remote 等语言前缀形态
+    private static let localeRemotePath = try! NSRegularExpression(
+        pattern: "^/[a-z]{2}(-[a-z]{2})?/remote(/|$)"
+    )
 }
