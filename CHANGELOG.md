@@ -51,6 +51,9 @@
 - icon: 入口页徽标符号 @3x
 - icon: 入口页徽标符号 @2x
 - build(icon): 附产透明底 >_ 符号 imageset(入口页徽标用);路径改 pathlib 消除 ../ 形态
+## [v0.0.2-ios105 · iOS] — 2026-10-26
+
+- fix(ios): 重新登录登不上根修——WKUIDelegate 承载 OAuth 弹窗、放行登录 IdP 域、Safari UA、主帧 HTTP 错误接管、语言前缀远控链接判定
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。

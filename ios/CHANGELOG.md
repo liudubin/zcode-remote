@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios105
+
+- fix(ios): 重新登录登不上根修——WKUIDelegate 承载 OAuth 弹窗、放行登录 IdP 域、Safari UA、主帧 HTTP 错误接管、语言前缀远控链接判定
+
 ## 0.0.2-ios103
 
 - fix(ios): 入口页左上角徽标从 ⚡ emoji 换成与新 App 图标同款的 >_ 渐变符号
