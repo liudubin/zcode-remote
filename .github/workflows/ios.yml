@@ -55,6 +55,12 @@ jobs:
             build > /tmp/build.log 2>&1
           ec=$?
           grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/build.log | head -40
+          if [ "$ec" -ne 0 ]; then
+            echo "---- build.log tail ----"
+            tail -120 /tmp/build.log
+            echo "---- crash reports ----"
+            ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
+          fi
           exit $ec
 
       - name: Fake-sign & package IPA
@@ -108,6 +114,10 @@ jobs:
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build > /tmp/smoke.log 2>&1
           ec=$?
           grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/smoke.log | head -40
+          if [ "$ec" -ne 0 ]; then
+            echo "---- smoke.log tail ----"
+            tail -120 /tmp/smoke.log
+          fi
           exit $ec
 
       - name: Launch with -zcodeURL and screenshot
