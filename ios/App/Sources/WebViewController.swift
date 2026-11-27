@@ -24,6 +24,8 @@ final class WebViewController: UIViewController {
     var lastSafeB = 0
     /// 键盘当前是否可见（决定 safeB 用键盘顶还是 home 条）
     var keyboardVisible = false
+    /// 键盘当前 frame（屏坐标），键盘通知更新
+    var lastKeyboardFrame: CGRect?
 
     /// 页面深浅（onTheme/onBars 回报）；状态栏与导航栏跟随
     var barsDark: Bool?

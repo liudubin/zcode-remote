@@ -1,7 +1,6 @@
-//
-//  EntryViewController+Ext.swift — 由 EntryViewController.swift 拆分（推送体积约束）
-//
+import AVFoundation
 import UIKit
+import UserNotifications
 
 extension EntryViewController {
     func buildFooter() -> UIView {

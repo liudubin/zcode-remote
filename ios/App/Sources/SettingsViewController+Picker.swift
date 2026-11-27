@@ -1,6 +1,6 @@
-
-// MARK: - 壁纸选图（PHPicker，iOS 14+；不申请相册权限，走系统选择器）
-
+import PhotosUI
+import UIKit
+import WebKit
 extension SettingsViewController: PHPickerViewControllerDelegate {
     func presentWallpaperPicker() {
         var cfg = PHPickerConfiguration()

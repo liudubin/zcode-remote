@@ -1,4 +1,5 @@
 import UIKit
+import UserNotifications
 
 /// 「终端窗 · 霓虹」深色主题（与新 App 图标同一设计语言）：
 /// 墨绿黑底 + 电光绿→青渐变主色。所有原生界面共用，会话页系统栏跟随页面深浅。

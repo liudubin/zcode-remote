@@ -1,7 +1,5 @@
-//
-//  WebViewController+Safety.swift — 由 WebViewController.swift 拆分（推送体积约束）
-//
 import UIKit
+import UserNotifications
 import WebKit
 
 extension WebViewController {
@@ -21,8 +19,6 @@ extension WebViewController {
         lastSafeB = css
         webView?.evaluateJavaScript("window.__zcodeSafeB=\(css);void 0", completionHandler: nil)
     }
-
-    var lastKeyboardFrame: CGRect?
 
     func setupObservers() {
         let kb = NotificationCenter.default.addObserver(
