@@ -3,7 +3,7 @@ import UIKit
 import UserNotifications
 import WebKit
 
-private let log = Logger(subsystem: "com.zcode.remote", category: "web")
+let log = Logger(subsystem: "com.zcode.remote", category: "web")
 
 /// 会话页：WKWebView + 注入增强层 + 原生桥（对应 Android WebActivity）。
 ///
@@ -12,42 +12,42 @@ private let log = Logger(subsystem: "com.zcode.remote", category: "web")
 /// - documentEnd（所有帧）：引导脚本——装桥、写 __zcodeSafeB/__zcSettings、调用 bundle（参数=当前设置）；
 /// - 设置热更新：重挂引导脚本（影响下次加载）+ __zcodeAPI.applySettings（影响当前页），与 Android 同款。
 final class WebViewController: UIViewController {
-    private let urlString: String
-    private let settings = SettingsStore.shared
-    private let dedupe = ReplyDedupe()
+    let urlString: String
+    let settings = SettingsStore.shared
+    let dedupe = ReplyDedupe()
 
-    private var webView: WKWebView!
-    private var progressView: UIProgressView!
-    private var progressObservation: NSKeyValueObservation?
+    var webView: WKWebView!
+    var progressView: UIProgressView!
+    var progressObservation: NSKeyValueObservation?
 
     /// 底部安全区/键盘让位（CSS px，由原生写入 window.__zcodeSafeB）
-    private var lastSafeB = 0
+    var lastSafeB = 0
     /// 键盘当前是否可见（决定 safeB 用键盘顶还是 home 条）
-    private var keyboardVisible = false
+    var keyboardVisible = false
 
     /// 页面深浅（onTheme/onBars 回报）；状态栏与导航栏跟随
-    private var barsDark: Bool?
+    var barsDark: Bool?
 
     /// 顶部自绘工具条与标题
-    private var topBar: UIVisualEffectView!
-    private let topTitle = UILabel()
+    var topBar: UIVisualEffectView!
+    let topTitle = UILabel()
 
-    private static let maxAutoRetry = 2
+    static let maxAutoRetry = 2
     /// 最近一次中间进度（通知副标题用，对齐 Android 保活通知预览）
-    private var lastPreview = ""
+    var lastPreview = ""
 
     /// 网络瞬断自动重试计数（didCommit 成功即清零）
-    private var retryCount = 0
+    var retryCount = 0
 
     /// OAuth 授权弹窗（子 WKWebView）与其模态宿主；同时最多一个
-    private var popupWebView: WKWebView?
-    private var popupHost: UIViewController?
+    var popupWebView: WKWebView?
+    var popupHost: UIViewController?
 
-    private var observers: [NSObjectProtocol] = []
+    var observers: [NSObjectProtocol] = []
 
     /// 移动 Safari 形态 UA：WebKit(605.1.15)/Safari(604.1)/Mobile(15E148) 是 Safari
     /// 多年冻结的固定 token，Version/ 跟随系统版本——与真机 Safari 发送的内容一致。
-    private static let safariUserAgent: String = {
+    static let safariUserAgent: String = {
         let ver = UIDevice.current.systemVersion
         let os = ver.replacingOccurrences(of: ".", with: "_")
         return "Mozilla/5.0 (iPhone; CPU iPhone OS \(os) like Mac OS X) " +
@@ -83,7 +83,7 @@ final class WebViewController: UIViewController {
 
     /// 顶部工具条：毛玻璃占位式（返回 | 机器名 | 设置），WebView 从其下沿开始，互不遮挡。
     /// 按钮用 SF Symbol 图标 + 固定 44×44 触达区，位置不受标题长度挤压。
-    private func buildTopBar() {
+    func buildTopBar() {
         let bar = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
         bar.backgroundColor = Theme.background.withAlphaComponent(0.6)
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -108,6 +108,13 @@ final class WebViewController: UIViewController {
         topTitle.adjustsFontSizeToFitWidth = true
         topTitle.minimumScaleFactor = 0.5
 
+        // 标题左缘品牌状态点（主色，呼应入口页会话列表）
+        let liveDot = UIView()
+        liveDot.backgroundColor = Theme.accent
+        liveDot.layer.cornerRadius = 3.5
+        liveDot.translatesAutoresizingMaskIntoConstraints = false
+        bar.contentView.addSubview(liveDot)
+
         for v in [back, topTitle, gear] {
             v.translatesAutoresizingMaskIntoConstraints = false
             bar.contentView.addSubview(v)
@@ -123,8 +130,12 @@ final class WebViewController: UIViewController {
             gear.trailingAnchor.constraint(equalTo: bar.contentView.trailingAnchor, constant: -4),
             gear.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
             gear.widthAnchor.constraint(equalToConstant: 44),
+            liveDot.leadingAnchor.constraint(equalTo: back.trailingAnchor, constant: 4),
+            liveDot.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
+            liveDot.widthAnchor.constraint(equalToConstant: 7),
+            liveDot.heightAnchor.constraint(equalToConstant: 7),
             topTitle.centerYAnchor.constraint(equalTo: bar.contentView.centerYAnchor),
-            topTitle.leadingAnchor.constraint(equalTo: back.trailingAnchor, constant: 4),
+            topTitle.leadingAnchor.constraint(equalTo: liveDot.trailingAnchor, constant: 7),
             topTitle.trailingAnchor.constraint(equalTo: gear.leadingAnchor, constant: -4),
         ])
         topBar = bar
@@ -152,7 +163,7 @@ final class WebViewController: UIViewController {
 
     // MARK: - WebView 与注入
 
-    private func setupWebView() {
+    func setupWebView() {
         let config = WKWebViewConfiguration()
         config.userContentController.add(self, name: "zcodeBridge")
         installBootstrap(into: config.userContentController)
@@ -197,7 +208,7 @@ final class WebViewController: UIViewController {
         }
     }
 
-    private func loadSession() {
+    func loadSession() {
         var raw = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         if raw.hasPrefix("zcode.z.ai") { raw = "https://" + raw }
         guard let url = URL(string: raw) else {
@@ -210,7 +221,7 @@ final class WebViewController: UIViewController {
     }
 
     /// （重）挂注入脚本：设置变化后重挂，下次页面加载即用新值
-    private func installBootstrap(into ucc: WKUserContentController) {
+    func installBootstrap(into ucc: WKUserContentController) {
         ucc.removeAllUserScripts()
         // 诊断模式：完全不注入（连桥 shim 都不挂），等价纯 WebView 与 Safari 对照
         if settings.bareWebview { return }
@@ -251,7 +262,7 @@ final class WebViewController: UIViewController {
           __zcodeInstallBridge(\(jsString(logoPosValue())), \(jsString(Trace.shared.jsonString())));
           window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
           window.__zcodeSafeB=\(lastSafeB);
-          window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack)};
+          window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack),"wpImage":\(jsString(settings.wallpaperDataURI)),"wpDim":\(settings.wpDim)};
           \(settings.injectLevel == .full ? fullCall : "")
           \(textZoomJS())
         })();
@@ -297,18 +308,18 @@ final class WebViewController: UIViewController {
         }
     }
 
-    private func resourceString(_ name: String) -> String? {
+    func resourceString(_ name: String) -> String? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "js") else { return nil }
         return try? String(contentsOf: url, encoding: .utf8)
     }
 
     /// Android：未拖过返回空串，JS 端按页面头部自动定位
-    private func logoPosValue() -> String {
+    func logoPosValue() -> String {
         guard settings.logoPosSet else { return "" }
         return "\(settings.logoX),\(settings.logoY)"
     }
 
-    private func textZoomJS() -> String {
+    func textZoomJS() -> String {
         let z = settings.textZoom
         if z == 100 { return "document.documentElement.style.webkitTextSizeAdjust='';" }
         return "document.documentElement.style.webkitTextSizeAdjust='\(z)%';"
@@ -317,9 +328,9 @@ final class WebViewController: UIViewController {
     /// 上次已应用的设置快照（对齐 Android 的 applied 机制）：
     /// 设置没变就绝不触碰页面——之前每次关设置页都无条件重挂脚本+热更新，
     /// 在 WKWebView 上正是下滑关闭设置后白屏的触发点。
-    private var appliedKey: String?
+    var appliedKey: String?
 
-    private func currentKey() -> String {
+    func currentKey() -> String {
         let s = settings
         var parts: [String] = [
             s.hideScrollbar, s.turnNavigator, s.notifyReply, s.floatingInput,
@@ -327,6 +338,9 @@ final class WebViewController: UIViewController {
             s.bareWebview, s.injectLevel == .full,
         ].map { String($0) }
         parts.append(String(s.textZoom))
+        // 壁纸：原图戳 + 压暗档（同压暗换图靠戳触发重挂）
+        parts.append(String(s.wallpaperStamp))
+        parts.append(String(s.wpDim))
         return parts.joined(separator: ",")
     }
 
@@ -348,387 +362,11 @@ final class WebViewController: UIViewController {
             "\"floatInput\":\(s.floatingInput)," +
             "\"restoreOnBottom\":\(s.restoreOnBottom)," +
             "\"sendMinimize\":\(s.sendMinimize)," +
-            "\"amoledBlack\":\(s.amoledBlack)})"
+            "\"amoledBlack\":\(s.amoledBlack)," +
+            "\"wpImage\":\(jsString(s.wallpaperDataURI))," +
+            "\"wpDim\":\(s.wpDim)})"
         webView.evaluateJavaScript(js, completionHandler: nil)
         webView.evaluateJavaScript(textZoomJS(), completionHandler: nil)
     }
 
-    // MARK: - 安全区 / 键盘
-
-    /// 底部让位：键盘期 = 键盘顶到屏底的高（含 home 条），无键盘 = home 条高。
-    /// 注入层据此抬升悬浮输入/图标（1s 轮询读 __zcodeSafeB，动画略有滞后可接受）。
-    private func updateSafeB() {
-        var css = 0
-        if keyboardVisible, let end = lastKeyboardFrame {
-            let inView = view.convert(end, from: nil)
-            css = max(0, Int((view.bounds.maxY - inView.minY).rounded()))
-        } else {
-            css = Int(view.safeAreaInsets.bottom.rounded())
-        }
-        guard css != lastSafeB else { return }
-        lastSafeB = css
-        webView?.evaluateJavaScript("window.__zcodeSafeB=\(css);void 0", completionHandler: nil)
-    }
-
-    private var lastKeyboardFrame: CGRect?
-
-    private func setupObservers() {
-        let kb = NotificationCenter.default.addObserver(
-            forName: UIApplication.keyboardWillChangeFrameNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            guard let self else { return }
-            self.lastKeyboardFrame = (note.userInfo?[UIApplication.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-            self.keyboardVisible = true
-            self.updateSafeB()
-        }
-        observers.append(kb)
-        let kbHide = NotificationCenter.default.addObserver(
-            forName: UIApplication.keyboardWillHideNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            self.keyboardVisible = false
-            self.updateSafeB()
-        }
-        observers.append(kbHide)
-
-        let bg = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            // 切后台：静音音频保活（设置可关），WebSocket 不断连、回复照常通知
-            guard let self, self.settings.keepAliveEnabled else { return }
-            KeepAlive.shared.start(minutes: self.settings.keepAliveMinutes)
-        }
-        observers.append(bg)
-        let fg = NotificationCenter.default.addObserver(
-            forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
-        ) { _ in
-            KeepAlive.shared.stop()
-        }
-        observers.append(fg)
-    }
-
-    // MARK: - 返回 / 设置
-
-    @objc private func onBack() {
-        if webView.canGoBack {
-            webView.goBack()
-        } else {
-            navigationController?.popViewController(animated: true)
-        }
-    }
-
-    @objc private func openSettingsUI() {
-        let vc = SettingsViewController(
-            onChange: { [weak self] in self?.applySettingsIfChanged() },
-            diagnostics: { [weak self] done in self?.collectPageDiagnostics(done) }
-        )
-        present(UINavigationController(rootViewController: vc), animated: true)
-    }
-
-    /// 从最顶层 VC 弹对话框：授权弹窗（模态）在场时直接 present 会被 iOS 静默忽略
-    private func presentFromTop(_ vc: UIViewController) {
-        var top: UIViewController = self
-        while let next = top.presentedViewController { top = next }
-        top.present(vc, animated: true)
-    }
-
-    // MARK: - 通知
-
-    private func postReplyNotification(_ text: String) {
-        let content = UNMutableNotificationContent()
-        content.title = title ?? "ZCode 远控"
-        if !lastPreview.isEmpty { content.subtitle = String(lastPreview.prefix(60)) }
-        content.body = String(text.prefix(200))
-        content.sound = .default
-        let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(req)
-    }
-
-    /// 事件后刷新 trace 快照（主帧），诊断卡下一次打开即为新值
-    private func refreshNativeTrace() {
-        webView?.evaluateJavaScript(
-            "window.__zcodeNativeTrace=\(Trace.shared.jsonString());void 0", completionHandler: nil
-        )
-    }
-}
-
-// MARK: - 原生桥（zcodeBridge）
-
-extension WebViewController: WKScriptMessageHandler {
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "zcodeBridge",
-              let body = message.body as? [String: Any],
-              let fn = body["fn"] as? String,
-              let args = body["args"] as? [Any] else { return }
-        DispatchQueue.main.async { self.route(fn, args) }
-    }
-
-    private func route(_ fn: String, _ args: [Any]) {
-        switch fn {
-        case "onReply":
-            let text = str(args, 0)
-            Trace.shared.record("onReply", text, "appVisible=\(UIApplication.shared.applicationState == .active)")
-            if dedupe.markSeen(text) {
-                Trace.shared.record("dedup", text, "skipped")
-            } else {
-                postReplyNotification(text)
-                Trace.shared.record("notified", text, "posted")
-            }
-            refreshNativeTrace()
-        case "onProgress":
-            lastPreview = str(args, 0)
-        case "onTheme":
-            settings.pageThemeDark = boolean(args, 3)
-        case "onBars":
-            let tR = num(args, 0), tDark = boolean(args, 3)
-            barsDark = tDark
-            if let c = Theme.pageColor(r: tR, g: num(args, 1), b: num(args, 2)) {
-                view.backgroundColor = c
-                webView.backgroundColor = c
-            }
-        case "openSettings":
-            openSettingsUI()
-        case "saveLogoPos":
-            settings.logoPosSet = true
-            settings.logoX = double(args, 0)
-            settings.logoY = double(args, 1)
-        case "setGestureExclude":
-            break // iOS 无系统手势豁免需求，接受即忽略
-        case "jsError":
-            // shim 上报的页面/注入层 JS 错误（注入诊断用）
-            let msg = str(args, 0)
-            Trace.shared.record("jsError", msg, "")
-            log.error("jsError \(msg, privacy: .public)")
-        default:
-            break
-        }
-    }
-
-    private func str(_ a: [Any], _ i: Int) -> String { a.indices.contains(i) ? (a[i] as? String ?? "") : "" }
-    private func num(_ a: [Any], _ i: Int) -> Int { a.indices.contains(i) ? ((a[i] as? NSNumber)?.intValue ?? 0) : 0 }
-    private func double(_ a: [Any], _ i: Int) -> Double { a.indices.contains(i) ? ((a[i] as? NSNumber)?.doubleValue ?? 0) : 0 }
-    private func boolean(_ a: [Any], _ i: Int) -> Bool { a.indices.contains(i) ? ((a[i] as? NSNumber)?.boolValue ?? false) : false }
-    private func jsString(_ s: String) -> String {
-        (try? JSONSerialization.data(withJSONObject: s, options: [.fragmentsAllowed]))
-            .flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-    }
-}
-
-// MARK: - 导航策略
-
-extension WebViewController: WKNavigationDelegate {
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
-        let scheme = url.scheme?.lowercased() ?? ""
-        guard scheme == "http" || scheme == "https" else {
-            // 非 http(s) scheme 一律拦截
-            decisionHandler(.cancel)
-            return
-        }
-        // 主帧导航做域校验（targetFrame == nil 是 window.open 弹窗，同样走主帧校验，
-        // 由 WKUIDelegate.createWebViewWith 转回当前 WebView 承接）；子帧/资源帧放行
-        if navigationAction.targetFrame?.isMainFrame ?? true {
-            if isInAppAllowed(url) {
-                decisionHandler(.allow)
-                return
-            }
-            // 域外主帧导航：确认后跳系统浏览器（远控链接即凭证，离开前先确认）
-            decisionHandler(.cancel)
-            let alert = UIAlertController(
-                title: "打开外部链接？", message: url.absoluteString, preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "打开", style: .default) { _ in
-                UIApplication.shared.open(url)
-            })
-            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            presentFromTop(alert)
-            return
-        }
-        decisionHandler(.allow)
-    }
-
-    /// 主帧 HTTP 错误接管：远控链接失效时服务端直接回 404（线上实测 /cn/remote 对
-    /// 无效 sid 即 404），不接管的话 WebView 会渲染 z.ai 的裸 404 页——用户既看不到
-    /// "重试/返回"也没有任何提示，就是"重新登录登不上"看到的死页面。
-    /// 只管主会话 WebView：OAuth 弹窗的回调链交给页面自己处理，不横加干预。
-    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
-                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        if webView === self.webView,
-           navigationResponse.isForMainFrame,
-           let http = navigationResponse.response as? HTTPURLResponse,
-           http.statusCode >= 400 {
-            decisionHandler(.cancel)
-            let alert = UIAlertController(
-                title: "会话打不开（HTTP \(http.statusCode)）",
-                message: "远控链接可能已失效：桌面端 ZCode 重新配对（左下角手机图标出新二维码）后，返回入口页重新扫码进入。",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "返回入口页", style: .default) { [weak self] _ in self?.onBack() })
-            alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in self?.loadSession() })
-            presentFromTop(alert)
-            return
-        }
-        decisionHandler(.allow)
-    }
-
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation?) {
-        if webView === self.webView { retryCount = 0 }
-        log.info("didCommit \(webView.url?.absoluteString ?? "-", privacy: .public)")
-    }
-
-    /// WebContent 进程被系统杀掉（切后台/内存压力）后，WKWebView 恢复的页面不会重新执行
-    /// user scripts——增强层会凭空消失（表现为回来后悬浮按钮没了、诊断 ran:false）。
-    /// 处理：进程死亡回调直接整页重载，注入链路随之完整重建。
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        log.error("webContent terminated, reloading")
-        Trace.shared.record("webkill", "", "reload")
-        webView.reload()
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
-        log.info("didFinish \(webView.url?.absoluteString ?? "-", privacy: .public)")
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation?, withError error: Error) {
-        let ns = error as NSError
-        // NSURLErrorCancelled = 页面自身重定向/被新导航顶掉，正常现象不算失败
-        guard ns.code != NSURLErrorCancelled else { return }
-        log.error("didFailProvisional \(ns.code) \(ns.localizedDescription, privacy: .public)")
-        // 弹窗 WebView 失败不弹主会话的错误框（重试动作对弹窗无意义），用户可直接 ✕ 关掉
-        guard webView === self.webView else { return }
-
-        // DNS/瞬断类失败自动退避重试（真机实测 zcode.z.ai 在部分网络下间歇解析失败）
-        if isTransientNetworkError(ns.code), retryCount < Self.maxAutoRetry {
-            retryCount += 1
-            let delay = Double(retryCount) * 1.5
-            log.info("auto retry #\(self.retryCount, privacy: .public) in \(Int(delay), privacy: .public)s")
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.loadSession()
-            }
-            return
-        }
-
-        let hint = isTransientNetworkError(ns.code)
-            ? "手机网络访问 zcode.z.ai 失败（错误码 \(ns.code)）。如果桌面端挂着代理，手机也需要同样的网络环境；可在 Safari 里打开同一链接对照验证。"
-            : "\(error.localizedDescription)（错误码 \(ns.code)）"
-        let alert = UIAlertController(title: "页面加载失败", message: hint, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "返回", style: .default) { [weak self] _ in self?.onBack() })
-        alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in self?.loadSession() })
-        presentFromTop(alert)
-    }
-
-    /// DNS 解析失败/连接丢失/超时：大概率网络瞬断，自动重试有意义；
-    /// 其余（证书、不支持 URL 等）重试无意义，直接报错。
-    private func isTransientNetworkError(_ code: Int) -> Bool {
-        [NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost,
-         NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut,
-         NSURLErrorNotConnectedToInternet, NSURLErrorDNSLookupFailed].contains(code)
-    }
-
-    private func isZaiDomain(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "z.ai" || host == "zcode.z.ai" || host.hasSuffix(".z.ai")
-    }
-
-    /// WebView 内放行的域：z.ai 全家 + 登录身份提供商。zcode.z.ai 的登录页用
-    /// api/oauth/authorize 跳转第三方账号完成授权（线上 bundle 取证：bigmodel 系
-    /// + Google/Apple）；这些域名若被丢去系统浏览器，授权凭证会落在 Safari 里
-    /// 回不到 App——登录永远完不成。bigmodel.cn 与 z.ai 同属智谱，属同一信任域。
-    private func isInAppAllowed(_ url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else { return false }
-        if isZaiDomain(url) { return true }
-        return host == "bigmodel.cn" || host.hasSuffix(".bigmodel.cn") ||
-            host == "accounts.google.com" || host == "appleid.apple.com"
-    }
-}
-
-// MARK: - WKUIDelegate（弹窗与 JS 对话框）
-
-extension WebViewController: WKUIDelegate {
-    /// OAuth 授权链路普遍用 window.open 弹窗：authorize 页在弹窗里完成第三方账号登录，
-    /// 授权结束后弹窗页用 window.opener.postMessage 把凭证传回主页面、再 window.close。
-    /// 不实现此方法时 WKWebView 直接丢弃弹窗——点"登录"按钮毫无反应；
-    /// 只导航到当前 WebView 又会丢掉 opener 语义（回调 postMessage 无接收方），
-    /// 所以这里开一个真实的子 WebView 模态承载，语义完整。
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        guard popupWebView == nil else { return nil }
-        let popup = WKWebView(frame: view.bounds, configuration: configuration)
-        popup.navigationDelegate = self
-        popup.uiDelegate = self
-        popup.customUserAgent = Self.safariUserAgent
-
-        let host = UIViewController()
-        host.view.backgroundColor = .black
-
-        let titleBar = UIView()
-        titleBar.backgroundColor = UIColor(white: 0.08, alpha: 1)
-        titleBar.translatesAutoresizingMaskIntoConstraints = false
-        let label = UILabel()
-        label.text = "登录授权"
-        label.textColor = .white
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        let close = UIButton(type: .system)
-        close.setTitle("✕", for: .normal)
-        close.setTitleColor(.white, for: .normal)
-        close.addTarget(self, action: #selector(dismissPopup), for: .touchUpInside)
-        close.translatesAutoresizingMaskIntoConstraints = false
-        titleBar.addSubview(label)
-        titleBar.addSubview(close)
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        host.view.addSubview(titleBar)
-        host.view.addSubview(popup)
-        NSLayoutConstraint.activate([
-            titleBar.topAnchor.constraint(equalTo: host.view.safeAreaLayoutGuide.topAnchor),
-            titleBar.leadingAnchor.constraint(equalTo: host.view.leadingAnchor),
-            titleBar.trailingAnchor.constraint(equalTo: host.view.trailingAnchor),
-            titleBar.heightAnchor.constraint(equalToConstant: 44),
-            label.centerXAnchor.constraint(equalTo: titleBar.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: titleBar.centerYAnchor),
-            close.trailingAnchor.constraint(equalTo: titleBar.trailingAnchor, constant: -12),
-            close.centerYAnchor.constraint(equalTo: titleBar.centerYAnchor),
-            close.widthAnchor.constraint(equalToConstant: 44),
-            close.heightAnchor.constraint(equalToConstant: 44),
-            popup.topAnchor.constraint(equalTo: titleBar.bottomAnchor),
-            popup.bottomAnchor.constraint(equalTo: host.view.bottomAnchor),
-            popup.leadingAnchor.constraint(equalTo: host.view.leadingAnchor),
-            popup.trailingAnchor.constraint(equalTo: host.view.trailingAnchor),
-        ])
-        present(host, animated: true)
-        popupWebView = popup
-        popupHost = host
-        return popup
-    }
-
-    /// 弹窗页 window.close()：关掉模态，主页面继续走 postMessage 回调
-    func webViewDidClose(_ webView: WKWebView) {
-        guard webView === popupWebView else { return }
-        dismissPopup()
-    }
-
-    @objc private func dismissPopup() {
-        popupWebView?.stopLoading()
-        popupWebView = nil
-        popupHost?.dismiss(animated: true)
-        popupHost = nil
-    }
-
-    /// JS alert 原生化：登录/授权失败时页面的错误提示不再被静默吞掉
-    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "好", style: .default) { _ in completionHandler() })
-        presentFromTop(alert)
-    }
-
-    /// JS confirm 原生化：部分授权流程用 confirm 询问"是否继续/断开"
-    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "好", style: .default) { _ in completionHandler(true) })
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(false) })
-        presentFromTop(alert)
-    }
 }

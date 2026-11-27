@@ -88,6 +88,15 @@
       // v81：③键盘跟随已删除，kbFollowExp 键退役（旧存档多出的键无害）
       if (o.sendMinimize !== undefined) { sendMinimize = (o.sendMinimize !== false); ZSET.sendMinimize = sendMinimize; }
       if (o.amoledBlack !== undefined) { amoledBlack = (o.amoledBlack === true); ZSET.amoledBlack = amoledBlack; applyAmoled(); }
+      // 壁纸热切（图已含压暗，wpImage 空串=关）
+      if (o.wpImage !== undefined || o.wpDim !== undefined) {
+        if (o.wpImage !== undefined) { ZSET.wpImage = o.wpImage; }
+        if (o.wpDim !== undefined) { ZSET.wpDim = o.wpDim; }
+        try { applyWallpaper(); } catch (e) {
+          var _werr = window.__zcodeErrors || (window.__zcodeErrors = []);
+          _werr.push('wallpaper:' + String(e && e.message || e).slice(0, 140));
+        }
+      }
       // 滚动条热切（原生已注入原版，这里只在变化时加覆盖样式）
       if (o.scrollbar !== undefined) { setScrollbar(o.scrollbar); }
     }

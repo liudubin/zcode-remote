@@ -1,0 +1,138 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=1180">
+<style>
+:root{
+  --bg:#0A0E0D; --card:#121816; --raised:#181F1C; --input:#1E2522;
+  --text:#EFF5F1; --dim:#8A9890; --acc:#34EE9A; --acc2:#19C8E0;
+}
+body{background:#0c0f0e;font-family:-apple-system,'PingFang SC',sans-serif;color:var(--text);margin:0;padding:24px;display:flex;gap:26px;flex-wrap:wrap}
+.phone{width:355px;background:var(--bg);border-radius:44px;border:6px solid #262b29;overflow:hidden;position:relative;flex-shrink:0}
+.screen{padding:0 20px 20px;position:relative}
+.glowtop{position:absolute;top:0;left:0;right:0;height:240px;background:linear-gradient(180deg,rgba(52,238,154,.14),transparent);pointer-events:none}
+.statusbar{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-size:13px;font-weight:600;color:var(--text)}
+.header{display:flex;align-items:center;gap:14px;margin-top:12px}
+.badge{width:60px;height:60px;filter:drop-shadow(0 5px 14px rgba(52,238,154,.4))}
+.appname{font-size:24px;font-weight:700;letter-spacing:-.3px}
+.appname em{font-style:normal;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.subtitle{font-size:13px;color:var(--dim);margin-top:3px}
+.gear{margin-left:auto;color:var(--dim);font-size:18px}
+.cta{margin-top:24px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;gap:9px;font-weight:700;font-size:16px;color:#05170e;box-shadow:0 8px 16px rgba(52,238,154,.4)}
+.cta svg{width:19px;height:19px}
+.ctahint{text-align:center;font-size:11px;color:var(--dim);margin-top:10px}
+.card{margin-top:22px;background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:18px;padding:14px}
+.cardlabel{font-size:12px;font-weight:600;color:var(--dim);margin-bottom:10px}
+.inputrow{height:44px;background:var(--input);border-radius:12px;display:flex;align-items:center;padding:0 6px 0 12px;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:var(--dim)}
+.inputrow .pill{margin-left:auto;background:rgba(52,238,154,.13);color:var(--acc);font-family:-apple-system;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px}
+.gobtn{margin-top:10px;height:44px;background:var(--input);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--acc);font-weight:600;font-size:15px}
+.secttitle{font-size:17px;font-weight:700;margin-top:26px}
+.recent{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid rgba(255,255,255,.04);border-radius:14px;padding:14px;margin-top:10px}
+.dot{width:8px;height:8px;border-radius:4px;background:var(--acc);flex-shrink:0}
+.rtitle{font-size:15px;font-weight:600}
+.rsub{font-family:ui-monospace,monospace;font-size:11px;color:var(--dim);margin-top:3px}
+.chev{margin-left:auto;color:var(--dim);font-size:14px}
+.footer{text-align:center;font-size:10px;color:var(--dim);margin-top:22px}
+/* settings */
+.nav{display:flex;align-items:center;height:52px;position:relative}
+.nav .t{position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:17px}
+.nav .done{margin-left:auto;color:var(--acc);font-weight:600;font-size:16px}
+.shead{color:var(--acc);font-size:12px;font-weight:700;margin:22px 4px 8px;text-transform:uppercase}
+.srow{background:var(--card);border-radius:14px 14px 0 0;padding:11px 14px;display:flex;align-items:center;gap:12px}
+.srow+.srow{border-radius:0}
+.srow.last{border-radius:0 0 14px 14px}
+.chip{width:30px;height:30px;border-radius:9px;background:rgba(52,238,154,.13);display:flex;align-items:center;justify-content:center;color:var(--acc);flex-shrink:0}
+.chip svg{width:15px;height:15px}
+.st{font-size:15px;font-weight:500}
+.ss{font-size:11px;color:var(--dim);margin-top:2px}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.switch{width:46px;height:28px;border-radius:14px;background:var(--acc);position:relative}
+.switch.off{background:#39423d}
+.switch i{position:absolute;top:2px;width:24px;height:24px;border-radius:12px;background:#fff;right:2px}
+.switch.off i{right:auto;left:2px}
+.seg{display:flex;background:var(--input);border-radius:8px;padding:2px;font-size:12px}
+.seg span{padding:4px 10px;border-radius:6px;color:var(--dim)}
+.seg span.on{background:var(--acc);color:#05170e;font-weight:600}
+.sfoot{font-size:11px;color:var(--dim);margin:8px 12px 0}
+/* scanner */
+.scan{height:640px;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
+.vf{width:220px;height:220px;position:relative}
+.corner{position:absolute;width:26px;height:26px;border-color:var(--acc);border-style:solid;border-width:0}
+.c1{top:0;left:0;border-top-width:3.5px;border-left-width:3.5px;border-radius:8px 0 0 0}
+.c2{top:0;right:0;border-top-width:3.5px;border-right-width:3.5px;border-radius:0 8px 0 0}
+.c3{bottom:0;left:0;border-bottom-width:3.5px;border-left-width:3.5px;border-radius:0 0 0 8px}
+.c4{bottom:0;right:0;border-bottom-width:3.5px;border-right-width:3.5px;border-radius:0 0 8px 0}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.closebtn{position:absolute;top:58px;right:16px;width:42px;height:42px;border-radius:21px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+.hintcard{position:absolute;bottom:36px;left:28px;right:28px;background:rgba(20,20,20,.75);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 16px;text-align:center;font-size:13px;font-weight:500;color:#ebefe9}
+h2{width:100%;font-size:15px;color:#9fb3a9;margin:6px 0 0;font-weight:600}
+
+h1{font-size:20px;margin:6px 0 14px}
+.divider{width:100%;text-align:center;color:#5f6f67;font-size:12px;letter-spacing:2px;margin:26px 0 12px}
+</style></head><body>
+<h1>ZCode Remote · UI v3 重设计「终端窗 · 霓虹」</h1>
+
+<h2>NEW · App 图标（1024）</h2>
+<div class="row"><img class="big" src="../ios/App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon1024.png"><img class="mid" src="../ios/App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon1024.png"><img class="tiny" src="../ios/App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon1024.png"></div>
+<h2>NEW · 入口页徽标（透明底卡）</h2>
+<div class="row"><img class="badge" src="../ios/App/Resources/Assets.xcassets/IconSymbol.imageset/IconSymbol@3x.png"></div>
+<h2>Android 自适应合成预览（圆掩码 + 前景缩进）</h2>
+<div class="row"><img class="mid" style="border-radius:24px;background:#12A868" src="../app/src/main/res/drawable-nodpi/ic_launcher_foreground.png"></div>
+<h2>OLD（对照）</h2>
+<div class="row"><img class="big" style="border-radius:52px" src="../docs/assets/logo_baseline.png"><img class="tiny" style="border-radius:11px" src="../docs/assets/logo_baseline.png"></div>
+
+<div class="divider">—— 三屏视觉 · 入口 / 设置（含个性化壁纸）/ 扫码 ——</div>
+
+
+<div><h2>① 入口页（重设计）</h2><div class="phone"><div class="screen">
+<div class="glowtop"></div>
+<div class="statusbar"><span>9:41</span><span>●●● ⚡ ▮</span></div>
+<div class="header">
+  <img class="badge" src="../ios/App/Resources/Assets.xcassets/IconSymbol.imageset/IconSymbol@3x.png">
+  <div><div class="appname">ZCode<em>Remote</em></div><div class="subtitle">手机远控你的 AI 编程智能体</div></div>
+  <div class="gear">⚙</div>
+</div>
+<div class="cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 20h1M14 20h3"/></svg>扫桌面端二维码</div>
+<div class="ctahint">桌面端 ZCode 左下角「手机图标」→ 显示远控二维码</div>
+<div class="card">
+  <div class="cardlabel">或用链接进入</div>
+  <div class="inputrow">https://zcode.z.ai/remote/s…<span class="pill">粘贴</span></div>
+  <div class="gobtn">进入会话 →</div>
+</div>
+<div class="secttitle">最近会话</div>
+<div class="recent"><span class="dot"></span><div><div class="rtitle">MACBOOK-PRO</div><div class="rsub">zcode.z.ai · 11-27 18:02</div></div><span class="chev">›</span></div>
+<div class="recent"><span class="dot"></span><div><div class="rtitle">studio-desktop</div><div class="rsub">zcode.z.ai · 11-26 21:47</div></div><span class="chev">›</span></div>
+<div class="footer">非智谱官方产品 · 链接即凭证，仅存本机</div>
+</div></div></div>
+
+<div><h2>② 设置页（重设计）</h2><div class="phone"><div class="screen">
+<div class="statusbar"><span>9:41</span><span>●●● ⚡ ▮</span></div>
+<div class="nav"><div class="t">设置</div><span class="done">完成</span></div>
+<div class="shead">个性化</div>
+<div class="srow"><div class="chip">🖼</div><div><div class="st">选择背景图</div><div class="ss">已设置 · 点按更换</div></div><div class="right"><span class="chev">›</span></div></div>
+<div class="srow"><div class="chip">☀</div><div><div class="st">背景压暗</div><div class="ss">烘焙进图里，越深消息区越沉</div></div><div class="right"><div class="seg"><span>25%</span><span class="on">45%</span><span>65%</span><span>85%</span></div></div></div>
+<div class="srow last"><div class="chip" style="background:rgba(242,89,89,.14);color:#F25959">🗑</div><div><div class="st" style="color:#F25959">清除背景图</div></div><div class="right"></div></div>
+<div class="sfoot">背景只在本机生效；建议搭配深色主题，压暗越深消息区越沉。</div>
+<div class="shead">会话页</div>
+<div class="srow"><div class="chip">≡</div><div><div class="st">隐藏滚动条</div><div class="ss">关 = 3px 细滚动条</div></div><div class="right"><div class="switch off"><i></i></div></div></div>
+<div class="srow"><div class="chip">☰</div><div><div class="st">对话问题导航</div><div class="ss">左缘三滑唤出</div></div><div class="right"><div class="switch"><i></i></div></div></div>
+<div class="srow"><div class="chip">⌨</div><div><div class="st">浮动输入框</div><div class="ss">增强 UI 总开关</div></div><div class="right"><div class="switch"><i></i></div></div></div>
+<div class="srow last"><div class="chip">Aa</div><div><div class="st">文字缩放</div></div><div class="right"><div class="seg"><span>75%</span><span class="on">100%</span><span>125%</span><span>150%</span></div></div></div>
+<div class="sfoot">以上改动即时生效并热更新当前会话页。</div>
+<div class="shead">后台与通知</div>
+<div class="srow"><div class="chip">🔔</div><div><div class="st">新回复通知</div><div class="ss">切出后弹系统通知</div></div><div class="right"><div class="switch"><i></i></div></div></div>
+<div class="srow last"><div class="chip">〜</div><div><div class="st">保活时长</div></div><div class="right"><div class="seg"><span class="on">10 分钟</span><span>30 分钟</span><span>不限</span></div></div></div>
+<div class="sfoot">保活在 App 进入后台时维持连接，到设定时长自动停止。</div>
+<div class="shead">关于</div>
+<div class="srow last"><div class="chip">i</div><div><div class="st">ZCodeRemote for iOS 0.0.2（build 1）</div><div class="ss">非智谱官方产品 · 链接即凭证，仅存本机</div></div></div>
+<div class="sfoot">注入层只改网页观感与行为，不收集任何数据。</div>
+</div></div></div>
+
+<div><h2>③ 扫码页（重设计）</h2><div class="phone"><div class="screen" style="padding:0">
+<div class="scan">
+  <div class="dim"></div>
+  <div class="vf"><div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div></div>
+  <div class="closebtn">✕</div>
+  <div class="hintcard">对准桌面端 ZCode 左下角「手机图标」弹出的二维码</div>
+</div>
+</div></div></div>
+
+
+</body></html>

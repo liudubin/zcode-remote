@@ -19,6 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Regenerate icons from source
+        # 图标源码即真相：构建前从 make_icon.py 重生成全套 PNG，
+        # 仓库里的图标二进制仅供浏览，缺位/过期都不影响构建
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 ios/tools/make_icon.py
+
       - name: Rebuild embedded bundle + validate
         # 与 Android CI 同款：先重拼注入包再全套校验（XML/Kotlin/JS 语法/资源引用），
         # iOS 的 ZCodeBundle.js 由 build_bundle.py 从同一源生成，保证两端注入包不漂移

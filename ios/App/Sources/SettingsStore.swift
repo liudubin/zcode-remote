@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// 基础设置：会话页外观与后台保活策略（UserDefaults，与 Android SettingsStore 字段一一对应）。
 final class SettingsStore {
@@ -125,6 +126,69 @@ final class SettingsStore {
         set { d.set(newValue, forKey: K.logoY) }
     }
 
+    // MARK: - 会话页壁纸（v82⑩：选图存原图文件，压暗合成后以 dataURI 走注入通道）
+
+    /// 壁纸原图文件（JPEG，已压长边 1600 / 质量 0.85）
+    private static let wpFileURL = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("zc_wallpaper.jpg")
+
+    /// 是否已设置壁纸
+    var hasWallpaper: Bool { FileManager.default.fileExists(atPath: Self.wpFileURL.path) }
+
+    /// 壁纸数据戳（原图字节数）：参与热更新 key，同压暗换图也能触发重挂
+    var wallpaperStamp: Int {
+        (try? FileManager.default.attributesOfItem(atPath: Self.wpFileURL.path)[.size] as? Int) ?? 0
+    }
+
+    /// 存壁纸原图（长边压 1600px，JPEG 0.85）
+    func saveWallpaper(_ image: UIImage) {
+        let maxSide: CGFloat = 1600
+        let scale = min(1, maxSide / max(image.size.width, image.size.height))
+        let size = CGSize(width: floor(image.size.width * scale), height: floor(image.size.height * scale))
+        let r = UIGraphicsImageRenderer(size: size == .zero ? image.size : size)
+        let scaled = scale < 1 ? r.image { _ in image.draw(in: CGRect(origin: .zero, size: size)) } : image
+        guard let data = scaled.jpegData(compressionQuality: 0.85) else { return }
+        try? data.write(to: Self.wpFileURL, options: .atomic)
+        wpCache = nil
+    }
+
+    /// 清除壁纸
+    func clearWallpaper() {
+        try? FileManager.default.removeItem(at: Self.wpFileURL)
+        wpCache = nil
+    }
+
+    /// 压暗档位（百分比 25/45/65/85）
+    var wpDim: Int {
+        get { d.object(forKey: K.wpDim) == nil ? 45 : d.integer(forKey: K.wpDim) }
+        set {
+            d.set(newValue, forKey: K.wpDim)
+            wpCache = nil
+        }
+    }
+
+    /// dataURI 缓存（原图戳+压暗不变即复用，避免每次 applySettings 重编码）
+    private var wpCache: (stamp: Int, dim: Int, uri: String)?
+
+    /// 合成压暗后的壁纸 dataURI（未设置返回空串）。压暗烘焙进图里，JS 端零计算。
+    var wallpaperDataURI: String {
+        guard hasWallpaper else { return "" }
+        let stamp = wallpaperStamp, dim = wpDim
+        if let c = wpCache, c.stamp == stamp, c.dim == dim { return c.uri }
+        guard let img = UIImage(contentsOfFile: Self.wpFileURL.path) else { return "" }
+        let r = UIGraphicsImageRenderer(size: img.size)
+        let out = r.image { ctx in
+            img.draw(in: CGRect(origin: .zero, size: img.size))
+            UIColor.black.withAlphaComponent(CGFloat(dim) / 100.0).setFill()
+            ctx.fill(CGRect(origin: .zero, size: img.size))
+        }
+        guard let data = out.jpegData(compressionQuality: 0.72) else { return "" }
+        let uri = "data:image/jpeg;base64," + data.base64EncodedString()
+        wpCache = (stamp, dim, uri)
+        return uri
+    }
+
     private struct K {
         static let hideScrollbar = "hide_scrollbar"
         static let turnNavigator = "turn_navigator"
@@ -143,5 +207,6 @@ final class SettingsStore {
         static let logoPosSet = "logo_pos_set"
         static let logoX = "logo_x"
         static let logoY = "logo_y"
+        static let wpDim = "wp_dim"
     }
 }
