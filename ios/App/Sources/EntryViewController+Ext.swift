@@ -160,10 +160,6 @@ extension EntryViewController {
         keyboardObservers.append(willHide)
     }
 
-    deinit {
-        keyboardObservers.forEach { NotificationCenter.default.removeObserver($0) }
-    }
-
     // MARK: - 动作
 
     @objc func onPaste() {

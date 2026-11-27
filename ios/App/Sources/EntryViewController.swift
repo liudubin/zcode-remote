@@ -24,6 +24,10 @@ final class EntryViewController: UIViewController, UITextFieldDelegate, UITableV
     let toastLabel = UILabel()
     var keyboardObservers: [NSObjectProtocol] = []
 
+    deinit {
+        keyboardObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.background

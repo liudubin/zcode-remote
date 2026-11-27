@@ -23,7 +23,10 @@ jobs:
         # 图标源码即真相：构建前从 make_icon.py 重生成全套 PNG，
         # 仓库里的图标二进制仅供浏览，缺位/过期都不影响构建
         run: |
-          python3 -m pip install --quiet pillow
+          # macOS runner 的 Homebrew python3 受 PEP 668 保护，裸 pip install 报
+          # externally-managed-environment；--break-system-packages 为其解法，
+          # || 兜底兼容无此限制的 ubuntu（regen-assets.yml 同款场景）
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
           python3 ios/tools/make_icon.py
 
       - name: Rebuild embedded bundle + validate
@@ -95,6 +98,9 @@ jobs:
       - name: Build for simulator
         run: |
           cd ios
+          # pipefail：xcodebuild 的失败不能被 | tail 管道吞掉（否则编译失败假绿，
+          # 真正暴露在 launch 步骤，定位成本高）
+          set -o pipefail
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Debug -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -20
