@@ -44,17 +44,19 @@ jobs:
         run: cd ios && xcodegen generate
 
       - name: Build (unsigned, device arm64)
-        # tail 管道会把 error 行挤出窗口（巨型编译指令行占满预算）。
-        # 改为全量落盘：退出码保留，只回显 error 行与构建结论，日志永不截断。
+        # bash -e 会在 xcodebuild 非零瞬间杀掉脚本（ec=$? 与诊断全不执行，
+        # 退出码透传 65 静默失败四轮）——|| true 挡住 -e，退出码手动透传。
+        # tail 管道会把 error 行挤出窗口（巨型编译指令行占满预算），
+        # 全量落盘：只回显 error 行与构建结论，失败时附带日志尾部与 crash 报告。
         run: |
           cd ios
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            build > /tmp/build.log 2>&1
+            build > /tmp/build.log 2>&1 || true
           ec=$?
-          grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/build.log | head -40
+          (grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/build.log | head -40) || true
           if [ "$ec" -ne 0 ]; then
             echo "---- build.log tail ----"
             tail -120 /tmp/build.log
@@ -106,14 +108,14 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
 
       - name: Build for simulator
-        # 同 build job：全量落盘 + 只回显 error 行，退出码保留
+        # 同 build job：|| true 挡 -e + 全量落盘 + 只回显 error 行，退出码保留
         run: |
           cd ios
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Debug -destination "platform=iOS Simulator,id=$UDID" \
-            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build > /tmp/smoke.log 2>&1
+            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build > /tmp/smoke.log 2>&1 || true
           ec=$?
-          grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/smoke.log | head -40
+          (grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/smoke.log | head -40) || true
           if [ "$ec" -ne 0 ]; then
             echo "---- smoke.log tail ----"
             tail -120 /tmp/smoke.log
