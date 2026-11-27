@@ -68,6 +68,11 @@
 - fix: Swift compile errors — stored props out of extensions, missing framework imports
 - fix: extension deinit moved to class body + CI pillow PEP668 + smoke pipefail
 - UI v3: terminal-window neon redesign + wallpaper + icon v3
+## [v0.0.2-ios119 · iOS] — 2026-11-27
+
+- fix(ui): composer input focus after preventDefault + GPU morph animation (v81 patch via CI)
+- fix: QR scanner never started session (lost wiring in refactor) + stop camera on close
+- fix: entry button icon misalignment + settings crash on missing cell registration
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。

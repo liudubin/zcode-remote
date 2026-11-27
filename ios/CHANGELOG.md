@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.0.2-ios119
+
+- fix(ui): composer input focus after preventDefault + GPU morph animation (v81 patch via CI)
+- fix: QR scanner never started session (lost wiring in refactor) + stop camera on close
+- fix: entry button icon misalignment + settings crash on missing cell registration
+
 ## 0.0.2-ios115
 
 - fix: constraint(greaterThanOrEqualTo/lessThanOrEqualTo) — correct anchor factory names
