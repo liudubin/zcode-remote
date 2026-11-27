@@ -183,14 +183,19 @@ final class EntryViewController: UIViewController, UITextFieldDelegate, UITableV
         scan.tintColor = UIColor(red: 0.02, green: 0.09, blue: 0.06, alpha: 1)
         scan.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
         scan.setBackgroundImage(Theme.accentButtonImage, for: .normal)
-        scan.setImage(
-            UIImage(systemName: "qrcode.viewfinder", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)),
-            for: .normal
+        // 图标独立贴右缘：UIButton.setImage 会让 [图标][文字] 组合居中，把文字挤偏右 ~11pt
+        let scanIcon = UIImageView(
+            image: UIImage(systemName: "qrcode.viewfinder", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
         )
-        scan.imageEdgeInsets = UIEdgeInsets(top: 0, left: -4, bottom: 0, right: 8)
+        scanIcon.tintColor = UIColor(red: 0.02, green: 0.09, blue: 0.06, alpha: 1)
+        scanIcon.contentMode = .center
+        scanIcon.translatesAutoresizingMaskIntoConstraints = false
+        scan.addSubview(scanIcon)
         scan.layer.cornerRadius = 16
         scan.layer.masksToBounds = true
         scan.heightAnchor.constraint(equalToConstant: 52).isActive = true
+        scanIcon.centerYAnchor.constraint(equalTo: scan.centerYAnchor).isActive = true
+        scanIcon.trailingAnchor.constraint(equalTo: scan.trailingAnchor, constant: -16).isActive = true
         scan.addTarget(self, action: #selector(onScan), for: .touchUpInside)
 
         // 辉光：外层容器承载阴影（按钮自身 masksToBounds 会杀掉阴影）
@@ -275,14 +280,18 @@ final class EntryViewController: UIViewController, UITextFieldDelegate, UITableV
         go.setTitleColor(Theme.accent, for: .normal)
         go.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
         go.backgroundColor = Theme.input
-        go.setImage(
-            UIImage(systemName: "arrow.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)),
-            for: .normal
+        // 同 scan：图标独立贴右缘，title 真居中（setImage 组合居中会把文字挤偏）
+        let goIcon = UIImageView(
+            image: UIImage(systemName: "arrow.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
         )
-        go.imageEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -6)
-        go.tintColor = Theme.accent
+        goIcon.tintColor = Theme.accent
+        goIcon.contentMode = .center
+        goIcon.translatesAutoresizingMaskIntoConstraints = false
+        go.addSubview(goIcon)
         go.layer.cornerRadius = 12
         go.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        goIcon.centerYAnchor.constraint(equalTo: go.centerYAnchor).isActive = true
+        goIcon.trailingAnchor.constraint(equalTo: go.trailingAnchor, constant: -14).isActive = true
         go.addTarget(self, action: #selector(onOpen), for: .touchUpInside)
 
         inputUrl.translatesAutoresizingMaskIntoConstraints = false

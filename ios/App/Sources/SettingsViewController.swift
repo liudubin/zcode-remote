@@ -26,6 +26,7 @@ final class SettingsViewController: UITableViewController {
             title: "完成", style: .done, target: self, action: #selector(onDone)
         )
         tableView.backgroundColor = .clear
+        tableView.register(SettingsCell.self, forCellReuseIdentifier: "settings")
     }
 
     @objc private func onDone() {
