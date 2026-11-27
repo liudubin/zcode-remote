@@ -324,8 +324,8 @@ final class SettingsCell: UITableViewCell {
 
             texts.leadingAnchor.constraint(equalTo: chip.trailingAnchor, constant: 12),
             texts.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            texts.topAnchor.constraint(greaterThanOrEqual: contentView.layoutMarginsGuide.topAnchor),
-            texts.bottomAnchor.constraint(lessThanOrEqual: contentView.layoutMarginsGuide.bottomAnchor),
+            texts.topAnchor.constraint(greaterThanOrEqualTo: contentView.layoutMarginsGuide.topAnchor),
+            texts.bottomAnchor.constraint(lessThanOrEqualTo: contentView.layoutMarginsGuide.bottomAnchor),
             texts.trailingAnchor.constraint(lessThanOrEqualTo: contentView.layoutMarginsGuide.trailingAnchor),
 
             seg.leadingAnchor.constraint(greaterThanOrEqualTo: texts.trailingAnchor, constant: 8),
