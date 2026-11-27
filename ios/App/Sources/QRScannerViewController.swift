@@ -14,6 +14,19 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     private let bracketLayer = CAShapeLayer()
     private let sessionQueue = DispatchQueue(label: "zcode.qr.session")
 
+    /// 扫码不工作的根因修复：setupSession/startRunning 从未被调用（拆分时丢了接线）。
+    /// viewDidAppear 里启动（bounds 已定型，取景框挖孔几何正确）；
+    /// startRunning 放后台队列避免主线程卡顿；previewLayer 已存在则不重复建 session。
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if previewLayer == nil { setupSession() }
+        guard !session.isRunning else { return }
+        let s = session
+        sessionQueue.async {
+            s.startRunning()
+        }
+    }
+
     /// 取景框（挖孔区）
     private var viewfinderRect: CGRect {
         let side = min(view.bounds.width, view.bounds.height) * 0.66
@@ -113,6 +126,11 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     }
 
     @objc private func onClose() {
+        // 停会话关摄像头（不停的话返回后指示灯常亮）
+        let s = session
+        sessionQueue.async {
+            if s.isRunning { s.stopRunning() }
+        }
         dismiss(animated: true)
     }
 
