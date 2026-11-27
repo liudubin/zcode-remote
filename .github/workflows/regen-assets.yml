@@ -10,6 +10,7 @@ on:
     branches: ['**']
     paths:
       - 'ios/tools/make_icon.py'
+      - 'ios/tools/_patch_v81.py'
       - 'dev/bundle/**'
       - '.github/workflows/regen-assets.yml'
 
@@ -29,6 +30,7 @@ jobs:
       - name: Regenerate icons + rebuild bundle
         run: |
           python3 ios/tools/make_icon.py
+          python3 ios/tools/_patch_v81.py
           python3 _patch_web2.py
           python3 _validate.py
           python3 ios/tools/build_bundle.py
