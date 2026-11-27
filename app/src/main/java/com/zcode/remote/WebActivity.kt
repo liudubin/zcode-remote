@@ -315,6 +315,10 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
         '--zc-stroke-strong:rgba(255,255,255,0.16)}' +
         'html.zc-amoled body,html.zc-amoled [data-testid="v4-timeline"],html.zc-amoled [data-testid="v4-timeline-scroll"]' +
         '{background-color:#000!important}' +
+        // v82⑩ 自定义背景（壁纸）：html 铺原生合成的图（含压暗），消息区透明让壁纸透出来；
+        // 气泡/代码块自带表面色不受影响，可读性由原生压暗滑杆兜底
+        'html.zc-wp,html.zc-wp body{background:transparent!important}' +
+        'html.zc-wp [data-testid="v4-timeline"],html.zc-wp [data-testid="v4-timeline-scroll"]{background:transparent!important}' +
         // v79③ 键盘跟随·实验已整套删除（v81，用户淘汰）：WebView 恢复 v72 行为——
         // 键盘把 content 垫高、WebView 随之缩放，页面自己坐到键盘上方，注入层零参与
         // 弹窗模式：dock 临时显示为底部容器（不遮挡全屏），输入部分隐藏，弹窗可见可点
@@ -1013,14 +1017,14 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       card.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;' +
         'width:min(340px,90vw);max-height:72vh;overflow-y:auto;background:var(--zc-bg-deep);' +
         '-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);' +
-        'border:1px solid var(--zc-stroke);border-radius:var(--zc-radius-lg);padding:14px;color:var(--zc-text-dim);' +
+""" +
+"""        'border:1px solid var(--zc-stroke);border-radius:var(--zc-radius-lg);padding:14px;color:var(--zc-text-dim);' +
         'font-size:12px;line-height:1.55;box-shadow:0 12px 40px rgba(0,0,0,0.6);' +
         'animation:zcodeFadeIn 0.18s ease-out;';
       var title = doc.createElement('div');
       title.textContent = '页面结构诊断';
       title.style.cssText = 'font-size:13px;font-weight:600;color:var(--zc-text-2);margin-bottom:8px;';
-""" +
-"""      var pre = doc.createElement('div');
+      var pre = doc.createElement('div');
       pre.style.cssText = 'white-space:pre-wrap;word-break:break-all;';
       pre.textContent = text;
       var copy = doc.createElement('div');
@@ -2147,7 +2151,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
         try {
           bodyPopupObs = new MutationObserver(function(){
             scanBodyPopups();
-            setTimeout(scanBodyPopups, 120);   // portal 挂载后内容/几何晚一拍到位
+""" +
+"""            setTimeout(scanBodyPopups, 120);   // portal 挂载后内容/几何晚一拍到位
             setTimeout(scanBodyPopups, 400);
           });
           bodyPopupObs.observe(doc.body, { childList: true });
@@ -2157,8 +2162,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       try {
         var all = doc.querySelectorAll(PAGE_POPUP_SEL);
         for (var i = 0; i < all.length; i++) {
-""" +
-"""          if (isPagePopup(all[i])) { found = true; break; }
+          if (isPagePopup(all[i])) { found = true; break; }
         }
       } catch (e) {}
       var html = doc.documentElement;
@@ -3080,6 +3084,15 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       // v81：③键盘跟随已删除，kbFollowExp 键退役（旧存档多出的键无害）
       if (o.sendMinimize !== undefined) { sendMinimize = (o.sendMinimize !== false); ZSET.sendMinimize = sendMinimize; }
       if (o.amoledBlack !== undefined) { amoledBlack = (o.amoledBlack === true); ZSET.amoledBlack = amoledBlack; applyAmoled(); }
+      // 壁纸热切（图已含压暗，wpImage 空串=关）
+      if (o.wpImage !== undefined || o.wpDim !== undefined) {
+        if (o.wpImage !== undefined) { ZSET.wpImage = o.wpImage; }
+        if (o.wpDim !== undefined) { ZSET.wpDim = o.wpDim; }
+        try { applyWallpaper(); } catch (e) {
+          var _werr = window.__zcodeErrors || (window.__zcodeErrors = []);
+          _werr.push('wallpaper:' + String(e && e.message || e).slice(0, 140));
+        }
+      }
       // 滚动条热切（原生已注入原版，这里只在变化时加覆盖样式）
       if (o.scrollbar !== undefined) { setScrollbar(o.scrollbar); }
     }
@@ -3177,7 +3190,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     // 行 = v4-row-<id>（id 稳定）；class 区分身份：group/user-row 我发的、group/assistant-row 助手发的；
     // 思考/工具是独立行且带 chat-reasoning/chat-tool/tool-summary 标记；
     // 反馈按钮 v4-feedback-like-<id> 在行外、按行 id 关联，出现 = 该行消息写完。
-    var pending2 = [];
+""" +
+"""    var pending2 = [];
     // 注入时基线：已存在的行永不提醒；用户行同时用于刷新锚点
     var rowBaseline = {};
     function rowIdOf(el){
@@ -3194,8 +3208,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     var watchers = {};      // rowId -> { row, lastLen, stable, timer }
     var doneRows = {};      // rowId -> true（已报过，防重）
     function watchRow(row){
-""" +
-"""      if (!replyActive) { return; }
+      if (!replyActive) { return; }
       var rid = rowIdOf(row);
       if (!rid || watchers[rid] || doneRows[rid]) { return; }
       traceAdd('watch', rid, '');
@@ -3343,6 +3356,36 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     if (replyActive) { bootstrapReply(); }
   };
 
+// ⑩ 会话页自定义背景（壁纸）：html 铺图 + 消息区透明化（结构规则在 CSS_BASE 的 html.zc-wp 段）。
+// 压暗由原生侧合成进图里（wpImage 直接是带暗度的 dataURI），JS 端零计算。
+// 设置键：wpImage(dataURI 空串=关) / wpDim(备用，压暗已烘焙，仅作元数据透传)。
+// 档位=最小 时不运行增强层，壁纸随增强层一起关闭（符合"最小=只装桥"语义）。
+function applyWallpaper() {
+  var html = document.documentElement;
+  var uri = (typeof ZSET.wpImage === 'string') ? ZSET.wpImage : '';
+  var on = uri.length > 24; // "data:image/jpeg;base64," 就 23 字符，再短必是坏的
+  var st = document.getElementById('zc-wp-style');
+  if (!on) {
+    if (st && st.parentNode) { st.parentNode.removeChild(st); }
+    html.classList.remove('zc-wp');
+    return;
+  }
+  var css = 'html.zc-wp{background-image:url("' + uri + '")!important;' +
+    'background-size:cover!important;background-position:center!important;' +
+    'background-repeat:no-repeat!important;background-attachment:fixed!important}';
+  if (st) { st.textContent = css; }
+  else {
+    st = document.createElement('style');
+    st.id = 'zc-wp-style';
+    st.textContent = css;
+    (document.head || html).appendChild(st);
+  }
+  html.classList.add('zc-wp');
+}
+try { applyWallpaper(); } catch (e) {
+  var _werr = window.__zcodeErrors || (window.__zcodeErrors = []);
+  _werr.push('wallpaper:' + String(e && e.message || e).slice(0, 140));
+}
   // ---------- 顶层执行 ----------
   // BODY 包 try/catch：注入失败不静默（错误进 __zcodeErrors，诊断卡可查）
   try {
