@@ -1690,6 +1690,12 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       if (!tg || !tg.closest) { return null; }
       var dk = tg.closest('[data-v4-composer-dock="true"]');
       if (!dk || dk.classList.contains('zcode-popup-mode') || dk.classList.contains('zcode-popup-present')) { return null; }
+      // v81「输入框弹出来了打不了字」：起点落在页面输入框（Lexical contenteditable/原生
+      // textarea 及其容器）上时挂"纯观察"track——不排除不拦截、滑动收纳不触发，
+      // 只在 dockGestureEnd 里补 focus（防 6px 即 preventDefault 连带取消合成 tap）
+      if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
+        return { x: x, y: y, t0: Date.now(), done: false, observe: true };
+      }
       if (tg.closest('textarea, input, select, button, a, [contenteditable], [role="button"], #zcode-composer-expand')) { return null; }
       return { x: x, y: y, t0: Date.now(), done: false, pill: dk.querySelector('.rounded-2xl') };
     }
@@ -1700,6 +1706,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     }
     function dockGestureMove(e){
       if (!dockTrack || dockTrack.done) { return; }
+      if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       var t = evXY(e);
       var dx = t.clientX - dockTrack.x, dy = t.clientY - dockTrack.y;
       // v69：方向拖动反馈——胶囊跟手平移（0.45 倍率、±110px 封顶），越阈正式动画从跟手位置
@@ -1729,14 +1736,26 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
         if (!composerFull) { toggleFullComposer(); }
       }
     }
-    function dockGestureEnd(){
+    function dockGestureEnd(e){
       if (dockTrack && !dockTrack.done && dockTrack.pill && dockDragTy) {
         // 未越阈：带过渡回弹，和触发路径在观感上明确区分
         dockTrack.pill.style.transition = 'transform 0.18s ease';
         dockTrack.pill.style.transform = '';
       }
+      var track = dockTrack;
       dockTrack = null;
       dockDragTy = 0;
+      // v81 补 focus：轻点输入框（未滑成、起点在输入框上）时合成 tap 已被 preventDefault
+      // 连带取消 → 页面输入框收不到 tap 不聚焦、键盘不起 → 这里手动补 focus。
+      // focus() 必须在触摸手势调用栈内才合法（touchend handler 正是），iOS WKWebView 有效。
+      if (track && !track.done && track.observe && e && e.changedTouches && e.changedTouches.length) {
+        try {
+          var t = e.changedTouches[0];
+          var el = doc.elementFromPoint(t.clientX, t.clientY);
+          var hit = el && el.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]');
+          if (hit && hit.focus) { hit.focus(); }
+        } catch (eF) {}
+      }
     }
     // ---------- 滑到底自动恢复输入框（v67，设置项"滑到底部恢复输入框"）----------
     // 收纳态内容满屏，滚到全部消息最底端 = 读完准备输入 → 输入框自动滑出（容器变换）。
@@ -2128,7 +2147,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       if (el.id && el.id.indexOf('zcode-') === 0) { return false; }
       try {
         // 我们自己的注入层不算（诊断卡/导航/遮罩）；dock 内弹窗走 popup-mode 复活，也不算
-        if (el.closest('#zcode-mask, #zcode-fallback-nav, #zcode-nav-hint, #zcode-nav-preview, #zcode-diag-card')) { return false; }
+""" +
+"""        if (el.closest('#zcode-mask, #zcode-fallback-nav, #zcode-nav-hint, #zcode-nav-preview, #zcode-diag-card')) { return false; }
         if (el.closest('[data-v4-composer-dock="true"]')) { return false; }
         var cs = getComputedStyle(el);
         if (cs.position !== 'fixed' && cs.position !== 'absolute') { return false; }
@@ -2151,8 +2171,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
         try {
           bodyPopupObs = new MutationObserver(function(){
             scanBodyPopups();
-""" +
-"""            setTimeout(scanBodyPopups, 120);   // portal 挂载后内容/几何晚一拍到位
+            setTimeout(scanBodyPopups, 120);   // portal 挂载后内容/几何晚一拍到位
             setTimeout(scanBodyPopups, 400);
           });
           bodyPopupObs.observe(doc.body, { childList: true });
@@ -2735,13 +2754,17 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       pill.style.visibility = 'hidden';
       void g.offsetWidth;   // 起点帧先生效，否则 transition 不触发
       var ease = ' cubic-bezier(0.2,0.8,0.2,1)';
-      g.style.transition = 'left ' + dur + 'ms' + ease + ',top ' + dur + 'ms' + ease +
-        ',width ' + dur + 'ms' + ease + ',height ' + dur + 'ms' + ease +
+      // v81「动画没有连贯性」：飞行改 transform（GPU 合成零回流）——left/top/width/height
+      // 五属性插值在 iOS WKWebView 上逐帧 layout，z.ai 主线程一忙就掉帧。
+      // translate+scale 一步到位，圆角仍插值（只 paint 不 layout）；非均匀 scale 压扁
+      // 描边/阴影在 280ms 飞行中段难辨，连贯性优先。
+      g.style.transformOrigin = 'top left';
+      g.style.willChange = 'transform';
+      g.style.transition = 'transform ' + dur + 'ms' + ease +
         ',border-radius ' + dur + 'ms ease';
-      g.style.left = to.x + 'px';
-      g.style.top = to.y + 'px';
-      g.style.width = Math.max(1, to.w) + 'px';
-      g.style.height = Math.max(1, to.h) + 'px';
+      g.style.transform = 'translate(' + (to.x - from.x).toFixed(1) + 'px,' + (to.y - from.y).toFixed(1) + 'px)' +
+        ' scale(' + (Math.max(1, to.w) / Math.max(1, from.w)).toFixed(4) + ',' +
+        (Math.max(1, to.h) / Math.max(1, from.h)).toFixed(4) + ')';
       g.style.borderRadius = radiusEnd || '22px';
       var tok = ++morphTok;
       setTimeout(function(){
@@ -3152,7 +3175,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     var settledRows = {};   // 已结束的行（基线/历史/出过反馈）→ runActive 跳过，避免每轮重复 querySelector
     function runActive(){
       if (root.querySelector('[data-testid^="v4-stop"], [data-testid^="chat-loading"]')) { return true; }
-      var rows = root.querySelectorAll('[data-testid^="v4-row"]');
+""" +
+"""      var rows = root.querySelectorAll('[data-testid^="v4-row"]');
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         var rid = rowIdOf(r);
@@ -3190,8 +3214,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     // 行 = v4-row-<id>（id 稳定）；class 区分身份：group/user-row 我发的、group/assistant-row 助手发的；
     // 思考/工具是独立行且带 chat-reasoning/chat-tool/tool-summary 标记；
     // 反馈按钮 v4-feedback-like-<id> 在行外、按行 id 关联，出现 = 该行消息写完。
-""" +
-"""    var pending2 = [];
+    var pending2 = [];
     // 注入时基线：已存在的行永不提醒；用户行同时用于刷新锚点
     var rowBaseline = {};
     function rowIdOf(el){

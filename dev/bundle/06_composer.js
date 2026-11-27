@@ -135,6 +135,12 @@
       if (!tg || !tg.closest) { return null; }
       var dk = tg.closest('[data-v4-composer-dock="true"]');
       if (!dk || dk.classList.contains('zcode-popup-mode') || dk.classList.contains('zcode-popup-present')) { return null; }
+      // v81「输入框弹出来了打不了字」：起点落在页面输入框（Lexical contenteditable/原生
+      // textarea 及其容器）上时挂"纯观察"track——不排除不拦截、滑动收纳不触发，
+      // 只在 dockGestureEnd 里补 focus（防 6px 即 preventDefault 连带取消合成 tap）
+      if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
+        return { x: x, y: y, t0: Date.now(), done: false, observe: true };
+      }
       if (tg.closest('textarea, input, select, button, a, [contenteditable], [role="button"], #zcode-composer-expand')) { return null; }
       return { x: x, y: y, t0: Date.now(), done: false, pill: dk.querySelector('.rounded-2xl') };
     }
@@ -145,6 +151,7 @@
     }
     function dockGestureMove(e){
       if (!dockTrack || dockTrack.done) { return; }
+      if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       var t = evXY(e);
       var dx = t.clientX - dockTrack.x, dy = t.clientY - dockTrack.y;
       // v69：方向拖动反馈——胶囊跟手平移（0.45 倍率、±110px 封顶），越阈正式动画从跟手位置
@@ -174,14 +181,26 @@
         if (!composerFull) { toggleFullComposer(); }
       }
     }
-    function dockGestureEnd(){
+    function dockGestureEnd(e){
       if (dockTrack && !dockTrack.done && dockTrack.pill && dockDragTy) {
         // 未越阈：带过渡回弹，和触发路径在观感上明确区分
         dockTrack.pill.style.transition = 'transform 0.18s ease';
         dockTrack.pill.style.transform = '';
       }
+      var track = dockTrack;
       dockTrack = null;
       dockDragTy = 0;
+      // v81 补 focus：轻点输入框（未滑成、起点在输入框上）时合成 tap 已被 preventDefault
+      // 连带取消 → 页面输入框收不到 tap 不聚焦、键盘不起 → 这里手动补 focus。
+      // focus() 必须在触摸手势调用栈内才合法（touchend handler 正是），iOS WKWebView 有效。
+      if (track && !track.done && track.observe && e && e.changedTouches && e.changedTouches.length) {
+        try {
+          var t = e.changedTouches[0];
+          var el = doc.elementFromPoint(t.clientX, t.clientY);
+          var hit = el && el.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]');
+          if (hit && hit.focus) { hit.focus(); }
+        } catch (eF) {}
+      }
     }
     // ---------- 滑到底自动恢复输入框（v67，设置项"滑到底部恢复输入框"）----------
     // 收纳态内容满屏，滚到全部消息最底端 = 读完准备输入 → 输入框自动滑出（容器变换）。
@@ -1179,13 +1198,17 @@
       pill.style.visibility = 'hidden';
       void g.offsetWidth;   // 起点帧先生效，否则 transition 不触发
       var ease = ' cubic-bezier(0.2,0.8,0.2,1)';
-      g.style.transition = 'left ' + dur + 'ms' + ease + ',top ' + dur + 'ms' + ease +
-        ',width ' + dur + 'ms' + ease + ',height ' + dur + 'ms' + ease +
+      // v81「动画没有连贯性」：飞行改 transform（GPU 合成零回流）——left/top/width/height
+      // 五属性插值在 iOS WKWebView 上逐帧 layout，z.ai 主线程一忙就掉帧。
+      // translate+scale 一步到位，圆角仍插值（只 paint 不 layout）；非均匀 scale 压扁
+      // 描边/阴影在 280ms 飞行中段难辨，连贯性优先。
+      g.style.transformOrigin = 'top left';
+      g.style.willChange = 'transform';
+      g.style.transition = 'transform ' + dur + 'ms' + ease +
         ',border-radius ' + dur + 'ms ease';
-      g.style.left = to.x + 'px';
-      g.style.top = to.y + 'px';
-      g.style.width = Math.max(1, to.w) + 'px';
-      g.style.height = Math.max(1, to.h) + 'px';
+      g.style.transform = 'translate(' + (to.x - from.x).toFixed(1) + 'px,' + (to.y - from.y).toFixed(1) + 'px)' +
+        ' scale(' + (Math.max(1, to.w) / Math.max(1, from.w)).toFixed(4) + ',' +
+        (Math.max(1, to.h) / Math.max(1, from.h)).toFixed(4) + ')';
       g.style.borderRadius = radiusEnd || '22px';
       var tok = ++morphTok;
       setTimeout(function(){
