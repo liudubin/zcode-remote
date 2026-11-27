@@ -44,14 +44,18 @@ jobs:
         run: cd ios && xcodegen generate
 
       - name: Build (unsigned, device arm64)
+        # tail 管道会把 error 行挤出窗口（巨型编译指令行占满预算）。
+        # 改为全量落盘：退出码保留，只回显 error 行与构建结论，日志永不截断。
         run: |
           cd ios
-          set -o pipefail
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            build 2>&1 | tail -60
+            build > /tmp/build.log 2>&1
+          ec=$?
+          grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/build.log | head -40
+          exit $ec
 
       - name: Fake-sign & package IPA
         run: |
@@ -96,14 +100,15 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
 
       - name: Build for simulator
+        # 同 build job：全量落盘 + 只回显 error 行，退出码保留
         run: |
           cd ios
-          # pipefail：xcodebuild 的失败不能被 | tail 管道吞掉（否则编译失败假绿，
-          # 真正暴露在 launch 步骤，定位成本高）
-          set -o pipefail
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Debug -destination "platform=iOS Simulator,id=$UDID" \
-            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -20
+            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build > /tmp/smoke.log 2>&1
+          ec=$?
+          grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/smoke.log | head -40
+          exit $ec
 
       - name: Launch with -zcodeURL and screenshot
         run: |
