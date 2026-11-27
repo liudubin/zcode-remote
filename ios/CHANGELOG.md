@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.0.2-ios115
+
+- fix: constraint(greaterThanOrEqualTo/lessThanOrEqualTo) — correct anchor factory names
+- fix: SettingsCell API misuse — anchor constraints, removeAction(for:), insertSegment
+- fix: Swift compile errors — stored props out of extensions, missing framework imports
+- fix: extension deinit moved to class body + CI pillow PEP668 + smoke pipefail
+- UI v3: terminal-window neon redesign + wallpaper + icon v3
+
 ## 0.0.2-ios105
 
 - fix(ios): 重新登录登不上根修——WKUIDelegate 承载 OAuth 弹窗、放行登录 IdP 域、Safari UA、主帧 HTTP 错误接管、语言前缀远控链接判定

@@ -61,6 +61,13 @@
 ## [v0.0.2-ios105 · iOS] — 2026-10-26
 
 - fix(ios): 重新登录登不上根修——WKUIDelegate 承载 OAuth 弹窗、放行登录 IdP 域、Safari UA、主帧 HTTP 错误接管、语言前缀远控链接判定
+## [v0.0.2-ios115 · iOS] — 2026-11-27
+
+- fix: constraint(greaterThanOrEqualTo/lessThanOrEqualTo) — correct anchor factory names
+- fix: SettingsCell API misuse — anchor constraints, removeAction(for:), insertSegment
+- fix: Swift compile errors — stored props out of extensions, missing framework imports
+- fix: extension deinit moved to class body + CI pillow PEP668 + smoke pipefail
+- UI v3: terminal-window neon redesign + wallpaper + icon v3
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。
