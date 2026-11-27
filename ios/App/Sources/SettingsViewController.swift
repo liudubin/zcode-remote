@@ -278,9 +278,9 @@ final class SettingsCell: UITableViewCell {
         selectedBackgroundView?.backgroundColor = Theme.input
 
         chip.layer.cornerRadius = 9
-        chip.backgroundColor = c.withAlphaComponent(0.14)
+        chip.backgroundColor = Theme.accent.withAlphaComponent(0.14)
         chip.translatesAutoresizingMaskIntoConstraints = false
-        chipIcon.tintColor = c
+        chipIcon.tintColor = Theme.accent
         chipIcon.contentMode = .center
         chipIcon.translatesAutoresizingMaskIntoConstraints = false
         chip.addSubview(chipIcon)
@@ -324,8 +324,8 @@ final class SettingsCell: UITableViewCell {
 
             texts.leadingAnchor.constraint(equalTo: chip.trailingAnchor, constant: 12),
             texts.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            texts.topAnchor.greaterThanOrEqualTo(contentView.layoutMarginsGuide.topAnchor),
-            texts.bottomAnchor.lessThanOrEqualTo(contentView.layoutMarginsGuide.bottomAnchor),
+            texts.topAnchor.constraint(greaterThanOrEqual: contentView.layoutMarginsGuide.topAnchor),
+            texts.bottomAnchor.constraint(lessThanOrEqual: contentView.layoutMarginsGuide.bottomAnchor),
             texts.trailingAnchor.constraint(lessThanOrEqualTo: contentView.layoutMarginsGuide.trailingAnchor),
 
             seg.leadingAnchor.constraint(greaterThanOrEqualTo: texts.trailingAnchor, constant: 8),
@@ -358,8 +358,8 @@ final class SettingsCell: UITableViewCell {
         tintColor = Theme.textSecondary
 
         // 复用池：先摘掉上一行的动作再挂新的
-        if let a = toggleAction { sw.removeAction(a) }
-        if let a = segAction { seg.removeAction(a) }
+        if let a = toggleAction { sw.removeAction(a, for: .valueChanged) }
+        if let a = segAction { seg.removeAction(a, for: .valueChanged) }
         toggleAction = nil
         segAction = nil
 
@@ -376,7 +376,7 @@ final class SettingsCell: UITableViewCell {
             toggleAction = action
         case .segments(let items, let selected, let setter):
             while seg.numberOfSegments < items.count {
-                seg.insertSegment(at: seg.numberOfSegments, title: nil, animated: false)
+                seg.insertSegment(withTitle: nil, at: seg.numberOfSegments, animated: false)
             }
             while seg.numberOfSegments > items.count {
                 seg.removeSegment(at: seg.numberOfSegments - 1, animated: false)
