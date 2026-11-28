@@ -259,6 +259,14 @@
           ' fixPending=' + (pending ? 1 : 0);
       } catch (e) {}
       out.uiTrace = uiTrace;
+      // ⑬壁纸诊断：ZSET 里 wpImage 长度（-1=类型异常/0=未设）+ zc-wp class + 背景样式标签在位性
+      try {
+        var wpLen = (typeof ZSET.wpImage === 'string') ? ZSET.wpImage.length : -1;
+        var wpSt = doc.getElementById('zc-wp-style');
+        out.wallpaper = 'len=' + wpLen +
+          ' cls=' + (de && de.classList.contains('zc-wp') ? 1 : 0) +
+          ' style=' + (wpSt ? 1 : 0) + (wpSt ? '(' + (wpSt.textContent || '').length + 'B)' : '');
+      } catch (eWp) { out.wallpaper = 'err:' + String(eWp && eWp.message || eWp).slice(0, 60); }
       out.jsErrors = (window.__zcodeErrors || []).slice(-10);
       out.composer = 'floatInput=' + floatInput + ' dock=' + (getDock() ? 1 : 0) +
         ' open=' + (composerOpen ? 1 : 0) + ' full=' + (composerFull ? 1 : 0) +

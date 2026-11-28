@@ -265,11 +265,10 @@ final class WebViewController: UIViewController {
           window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
           window.__zcodeSafeB=\(lastSafeB);
           window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack),"wpImage":\(jsString(settings.wallpaperDataURI)),"wpDim":\(settings.wpDim)};
-          /* 壁纸首载同步：bundle 在 documentStart 先跑（ZSET 抓的是当时的空 __zcSettings），
-             bootstrap 在 documentEnd 覆盖式赋值后 ZSET 引用已分家——必须把 bootstrap 的值
-             经 __zcodeAPI.applySettings 推进 bundle 的 ZSET，壁纸/开关才能首载生效。
-             try 保护：applySettings 在 documentEnd 时序下若抛异常，不能阻断后面的 fullCall */
-          try { window.__zcodeAPI && window.__zcodeAPI.applySettings(window.__zcSettings); } catch (eApply) {}
+          /* 壁纸时序真相（v82 实证）：bundle 在 documentStart 只是纯定义（__ZCODE_BUNDLE 函数不执行），
+             __zcodeAPI 要等 __zcGo（load+1.2s）调 __ZCODE_BUNDLE 时才挂载。因此 documentEnd 这里
+             绝不能调 applySettings（撞 undefined 静默 no-op）。首载壁纸走现成链：__zcGo → BODY →
+             06_composer ZSET 抓本对象（含 wpImage）→ 07b applyWallpaper 立即铺图+透明段，无需干预 */
           \(settings.injectLevel == .full ? fullCall : "")
           \(textZoomJS())
         })();
