@@ -27,6 +27,20 @@ final class SettingsViewController: UITableViewController {
         )
         tableView.backgroundColor = .clear
         tableView.register(SettingsCell.self, forCellReuseIdentifier: "settings")
+        tableView.estimatedRowHeight = 64 // 钉死估算：iOS 26 self-sizing 默认估算会算歪 contentSize
+    }
+
+    /// iOS 26 pageSheet + self-sizing 组合下偶发初始 contentOffset 落在列表中段，
+    /// 用户感知为设置页「显示不全」（顶部「个性化/会话页」两段不可见）。首次出现即归位。
+    private var didSnapTop = false
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !didSnapTop else { return }
+        didSnapTop = true
+        if tableView.contentOffset.y > 1 {
+            tableView.setContentOffset(.zero, animated: false)
+        }
     }
 
     @objc private func onDone() {
