@@ -1,5 +1,10 @@
 # 更新日志
 
+## 0.0.2-ios124
+
+- fix(wallpaper): add wallpaper module to bundle + scope fix + diagnostics
+- WebVC: guard applySettings bootstrap call with try/catch
+
 ## 0.0.2-ios121
 
 - fix: wallpaper & settings never applied on first page load (bootstrap overwrote ZSET after bundle init)
