@@ -26,6 +26,7 @@ jobs:
           python3 _patch_web2.py
           python3 ios/tools/_patch_v83_icon.py
           python3 ios/tools/_patch_v84_noball.py
+          python3 ios/tools/_patch_v85_zoom.py
           python3 _validate.py
           python3 ios/tools/build_bundle.py
 
@@ -79,6 +80,7 @@ jobs:
         run: |
           python3 ios/tools/_patch_v83_icon.py
           python3 ios/tools/_patch_v84_noball.py
+          python3 ios/tools/_patch_v85_zoom.py
           python3 ios/tools/build_bundle.py
           brew install xcodegen
           cd ios && xcodegen generate
