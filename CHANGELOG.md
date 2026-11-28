@@ -73,6 +73,9 @@
 - fix(ui): composer input focus after preventDefault + GPU morph animation (v81 patch via CI)
 - fix: QR scanner never started session (lost wiring in refactor) + stop camera on close
 - fix: entry button icon misalignment + settings crash on missing cell registration
+## [v0.0.2-ios121 · iOS] — 2026-11-28
+
+- fix: wallpaper & settings never applied on first page load (bootstrap overwrote ZSET after bundle init)
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。

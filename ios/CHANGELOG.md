@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios121
+
+- fix: wallpaper & settings never applied on first page load (bootstrap overwrote ZSET after bundle init)
+
 ## 0.0.2-ios119
 
 - fix(ui): composer input focus after preventDefault + GPU morph animation (v81 patch via CI)
