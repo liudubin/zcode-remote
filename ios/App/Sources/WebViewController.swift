@@ -265,6 +265,10 @@ final class WebViewController: UIViewController {
           window.zcodeBridge && window.zcodeBridge.jsError('boot:\(settings.injectLevel == .full ? "full" : "minimal")');
           window.__zcodeSafeB=\(lastSafeB);
           window.__zcSettings={"sendMinimize":\(settings.sendMinimize),"amoledBlack":\(settings.amoledBlack),"wpImage":\(jsString(settings.wallpaperDataURI)),"wpDim":\(settings.wpDim)};
+          /* 壁纸首载同步：bundle 在 documentStart 先跑（ZSET 抓的是当时的空 __zcSettings），
+             bootstrap 在 documentEnd 覆盖式赋值后 ZSET 引用已分家——必须把 bootstrap 的值
+             经 __zcodeAPI.applySettings 推进 bundle 的 ZSET，壁纸/开关才能首载生效 */
+          window.__zcodeAPI && window.__zcodeAPI.applySettings(window.__zcSettings);
           \(settings.injectLevel == .full ? fullCall : "")
           \(textZoomJS())
         })();
