@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios126
+
+- fix(settings): snap to top on first appear — iOS 26 initial contentOffset could land mid-list (user saw missing 个性化/会话页 sections); pin estimatedRowHeight
+
 ## 0.0.2-ios124
 
 - fix(wallpaper): add wallpaper module to bundle + scope fix + diagnostics
