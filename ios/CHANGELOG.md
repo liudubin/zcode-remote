@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios134
+
+- feat(ios): 取消浮动输入框（强制 floatInput=false + 删设置行）+ 原生输入框抬高 12px
+
 ## 0.0.2-ios132
 
 - fix(ios): 文字缩放改整页 zoom —— text-size-adjust 在 WKWebView 放大文字不缩容器，换行烂/溢出
