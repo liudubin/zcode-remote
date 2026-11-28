@@ -83,6 +83,9 @@
 ## [v0.0.2-ios126 · iOS] — 2026-11-28
 
 - fix(settings): snap to top on first appear — iOS 26 initial contentOffset could land mid-list (user saw missing 个性化/会话页 sections); pin estimatedRowHeight
+## [v0.0.2-ios128 · iOS] — 2026-11-28
+
+- feat(bundle): 收纳图标自由拖动+磁吸回弹落位(位置记忆)；唤出/收纳动画改弹性过冲曲线
 ## [未发布] — v81 工作区（bundleVer 58）
 
 v80 实机二验三条反馈的修复轮：两条居中根修 + 两个功能整套删除。
