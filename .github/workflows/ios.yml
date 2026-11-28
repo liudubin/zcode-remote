@@ -19,21 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Regenerate icons from source
-        # 图标源码即真相：构建前从 make_icon.py 重生成全套 PNG，
-        # 仓库里的图标二进制仅供浏览，缺位/过期都不影响构建
-        run: |
-          # macOS runner 的 Homebrew python3 受 PEP 668 保护，裸 pip install 报
-          # externally-managed-environment；--break-system-packages 为其解法，
-          # || 兜底兼容无此限制的 ubuntu（regen-assets.yml 同款场景）
-          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
-          python3 ios/tools/make_icon.py
-
       - name: Rebuild embedded bundle + validate
         # 与 Android CI 同款：先重拼注入包再全套校验（XML/Kotlin/JS 语法/资源引用），
         # iOS 的 ZCodeBundle.js 由 build_bundle.py 从同一源生成，保证两端注入包不漂移
         run: |
           python3 _patch_web2.py
+          python3 ios/tools/_patch_v83_icon.py
           python3 _validate.py
           python3 ios/tools/build_bundle.py
 
@@ -44,26 +35,14 @@ jobs:
         run: cd ios && xcodegen generate
 
       - name: Build (unsigned, device arm64)
-        # bash -e 会在 xcodebuild 非零瞬间杀掉脚本（ec=$? 与诊断全不执行，
-        # 退出码透传 65 静默失败四轮）——|| true 挡住 -e，退出码手动透传。
-        # tail 管道会把 error 行挤出窗口（巨型编译指令行占满预算），
-        # 全量落盘：只回显 error 行与构建结论，失败时附带日志尾部与 crash 报告。
         run: |
           cd ios
+          set -o pipefail
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath .build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            build > /tmp/build.log 2>&1 || true
-          ec=$?
-          (grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/build.log | head -40) || true
-          if [ "$ec" -ne 0 ]; then
-            echo "---- build.log tail ----"
-            tail -120 /tmp/build.log
-            echo "---- crash reports ----"
-            ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
-          fi
-          exit $ec
+            build 2>&1 | tail -60
 
       - name: Fake-sign & package IPA
         run: |
@@ -97,6 +76,7 @@ jobs:
 
       - name: Rebuild bundle + generate project
         run: |
+          python3 ios/tools/_patch_v83_icon.py
           python3 ios/tools/build_bundle.py
           brew install xcodegen
           cd ios && xcodegen generate
@@ -108,19 +88,11 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
 
       - name: Build for simulator
-        # 同 build job：|| true 挡 -e + 全量落盘 + 只回显 error 行，退出码保留
         run: |
           cd ios
           xcodebuild -project ZCodeRemote.xcodeproj -scheme ZCodeRemote \
             -configuration Debug -destination "platform=iOS Simulator,id=$UDID" \
-            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build > /tmp/smoke.log 2>&1 || true
-          ec=$?
-          (grep -E " error:|fatal error|Stack dump|BUILD (SUCCEEDED|FAILED)" /tmp/smoke.log | head -40) || true
-          if [ "$ec" -ne 0 ]; then
-            echo "---- smoke.log tail ----"
-            tail -120 /tmp/smoke.log
-          fi
-          exit $ec
+            -derivedDataPath .build CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -20
 
       - name: Launch with -zcodeURL and screenshot
         run: |
