@@ -1,5 +1,9 @@
 # 更新日志
 
+## 0.0.2-ios136
+
+- fix(ios): zoom 单挂修复 150% 白屏（html+body 双挂复合 2.25x）
+
 ## 0.0.2-ios134
 
 - feat(ios): 取消浮动输入框（强制 floatInput=false + 删设置行）+ 原生输入框抬高 12px
