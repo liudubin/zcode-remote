@@ -141,6 +141,12 @@
       if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
         return { x: x, y: y, t0: Date.now(), done: false, observe: true };
       }
+      // v81「输入框弹出来了打不了字」：起点落在页面输入框（Lexical contenteditable/原生
+      // textarea 及其容器）上时挂"纯观察"track——不排除不拦截、滑动收纳不触发，
+      // 只在 dockGestureEnd 里补 focus（防 6px 即 preventDefault 连带取消合成 tap）
+      if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
+        return { x: x, y: y, t0: Date.now(), done: false, observe: true };
+      }
       if (tg.closest('textarea, input, select, button, a, [contenteditable], [role="button"], #zcode-composer-expand')) { return null; }
       return { x: x, y: y, t0: Date.now(), done: false, pill: dk.querySelector('.rounded-2xl') };
     }
@@ -151,6 +157,7 @@
     }
     function dockGestureMove(e){
       if (!dockTrack || dockTrack.done) { return; }
+      if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       var t = evXY(e);
       var dx = t.clientX - dockTrack.x, dy = t.clientY - dockTrack.y;

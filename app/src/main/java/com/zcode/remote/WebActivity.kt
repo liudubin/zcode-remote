@@ -813,6 +813,14 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
           ' fixPending=' + (pending ? 1 : 0);
       } catch (e) {}
       out.uiTrace = uiTrace;
+      // ⑬壁纸诊断：ZSET 里 wpImage 长度（-1=类型异常/0=未设）+ zc-wp class + 背景样式标签在位性
+      try {
+        var wpLen = (typeof ZSET.wpImage === 'string') ? ZSET.wpImage.length : -1;
+        var wpSt = doc.getElementById('zc-wp-style');
+        out.wallpaper = 'len=' + wpLen +
+          ' cls=' + (de && de.classList.contains('zc-wp') ? 1 : 0) +
+          ' style=' + (wpSt ? 1 : 0) + (wpSt ? '(' + (wpSt.textContent || '').length + 'B)' : '');
+      } catch (eWp) { out.wallpaper = 'err:' + String(eWp && eWp.message || eWp).slice(0, 60); }
       out.jsErrors = (window.__zcodeErrors || []).slice(-10);
       out.composer = 'floatInput=' + floatInput + ' dock=' + (getDock() ? 1 : 0) +
         ' open=' + (composerOpen ? 1 : 0) + ' full=' + (composerFull ? 1 : 0) +
@@ -1006,7 +1014,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
             removed: /none/.test(mCs.webkitMaskImage || mCs.maskImage || '') ? 1 : 0
           };
         } else { out.maskState = { none: 1 }; }
-      } catch (e) { out.maskState = 'err'; }
+""" +
+"""      } catch (e) { out.maskState = 'err'; }
       return out;
     }
     function showDiagCard(){
@@ -1017,8 +1026,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       card.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;' +
         'width:min(340px,90vw);max-height:72vh;overflow-y:auto;background:var(--zc-bg-deep);' +
         '-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);' +
-""" +
-"""        'border:1px solid var(--zc-stroke);border-radius:var(--zc-radius-lg);padding:14px;color:var(--zc-text-dim);' +
+        'border:1px solid var(--zc-stroke);border-radius:var(--zc-radius-lg);padding:14px;color:var(--zc-text-dim);' +
         'font-size:12px;line-height:1.55;box-shadow:0 12px 40px rgba(0,0,0,0.6);' +
         'animation:zcodeFadeIn 0.18s ease-out;';
       var title = doc.createElement('div');
@@ -1696,6 +1704,12 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
         return { x: x, y: y, t0: Date.now(), done: false, observe: true };
       }
+      // v81「输入框弹出来了打不了字」：起点落在页面输入框（Lexical contenteditable/原生
+      // textarea 及其容器）上时挂"纯观察"track——不排除不拦截、滑动收纳不触发，
+      // 只在 dockGestureEnd 里补 focus（防 6px 即 preventDefault 连带取消合成 tap）
+      if (tg.closest('[data-testid^="v4-composer-input"], textarea, input, [contenteditable="true"]')) {
+        return { x: x, y: y, t0: Date.now(), done: false, observe: true };
+      }
       if (tg.closest('textarea, input, select, button, a, [contenteditable], [role="button"], #zcode-composer-expand')) { return null; }
       return { x: x, y: y, t0: Date.now(), done: false, pill: dk.querySelector('.rounded-2xl') };
     }
@@ -1706,6 +1720,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     }
     function dockGestureMove(e){
       if (!dockTrack || dockTrack.done) { return; }
+      if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       if (dockTrack.observe) { return; }   // v81 纯观察 track：起点在输入框上，不拦不触发
       var t = evXY(e);
       var dx = t.clientX - dockTrack.x, dy = t.clientY - dockTrack.y;
@@ -2127,7 +2142,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
               var hasMark = n.getAttribute && (n.getAttribute('data-testid') || n.getAttribute('role') || n.getAttribute('aria-modal') || n.getAttribute('data-state'));
               if (hasMark) { snapDockNode(n, dock); }
               else if (n.querySelector && n.querySelector(MARK)) {
-                // React 一次性插入整个子树：根节点无标记但内部有——快照根，链上能看出挂点
+""" +
+"""                // React 一次性插入整个子树：根节点无标记但内部有——快照根，链上能看出挂点
                 snapDockNode(n, dock);
               }
             }
@@ -2147,8 +2163,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
       if (el.id && el.id.indexOf('zcode-') === 0) { return false; }
       try {
         // 我们自己的注入层不算（诊断卡/导航/遮罩）；dock 内弹窗走 popup-mode 复活，也不算
-""" +
-"""        if (el.closest('#zcode-mask, #zcode-fallback-nav, #zcode-nav-hint, #zcode-nav-preview, #zcode-diag-card')) { return false; }
+        if (el.closest('#zcode-mask, #zcode-fallback-nav, #zcode-nav-hint, #zcode-nav-preview, #zcode-diag-card')) { return false; }
         if (el.closest('[data-v4-composer-dock="true"]')) { return false; }
         var cs = getComputedStyle(el);
         if (cs.position !== 'fixed' && cs.position !== 'absolute') { return false; }
@@ -3159,7 +3174,8 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     }
     function noise(el){
       if (!el || el.nodeType !== 1) { return true; }
-      if (el.id === 'zcode-fallback-nav' || el.id === 'zcode-nav-hint' || el.id === 'zcode-nav-preview' || el.id === 'zcode-diag-card') { return true; }
+""" +
+"""      if (el.id === 'zcode-fallback-nav' || el.id === 'zcode-nav-hint' || el.id === 'zcode-nav-preview' || el.id === 'zcode-diag-card') { return true; }
       if (el.closest && el.closest('#zcode-fallback-nav, #zcode-nav-hint, #zcode-nav-preview, #zcode-diag-card')) { return true; }
       if (el.getAttribute) {
         var tid = el.getAttribute('data-testid') || '';
@@ -3175,8 +3191,7 @@ table { display: block !important; max-width: 100% !important; overflow-x: auto 
     var settledRows = {};   // 已结束的行（基线/历史/出过反馈）→ runActive 跳过，避免每轮重复 querySelector
     function runActive(){
       if (root.querySelector('[data-testid^="v4-stop"], [data-testid^="chat-loading"]')) { return true; }
-""" +
-"""      var rows = root.querySelectorAll('[data-testid^="v4-row"]');
+      var rows = root.querySelectorAll('[data-testid^="v4-row"]');
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         var rid = rowIdOf(r);
